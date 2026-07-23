@@ -1,0 +1,27 @@
+{
+  "name": "git-who",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Manage git profiles for per-project SSH account configuration.",
+  "bin": {
+    "git-who": "./dist/bin/git-who.js"
+  },
+  "scripts": {
+    "lint": "eslint src bin test",
+    "test": "c8 mocha",
+    "typecheck": "tsc"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^24.13.3",
+    "c8": "^12.0.0",
+    "mocha": "^11.7.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0"
+  }
+}
