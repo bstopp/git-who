@@ -108,7 +108,7 @@ describe('utils/validators.js', () => {
     it('throws for a name that already exists', () => {
       assert.throws(
         () => validateUnique(profiles, 'work'),
-        {name: 'Error', message: "Profile 'work' already exists."},
+        { name: 'Error', message: "Profile 'work' already exists." },
       );
     });
   });

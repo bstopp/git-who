@@ -50,7 +50,7 @@ export function validateGpgSigningKey(value: string) {
 /**
  * @throws {Error} If value is not present.
  */
-export function validateSshSigningKey(value: any) {
+export function validateSshSigningKey(value: string) {
   if (!value) {
     throw new Error('SSH Signing key must be specified.');
   }
