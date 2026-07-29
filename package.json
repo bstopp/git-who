@@ -7,8 +7,8 @@
     "git-who": "./dist/bin/git-who.js"
   },
   "scripts": {
-    "lint": "eslint src bin test",
-    "test": "c8 mocha",
+    "lint": "eslint",
+    "test": "c8 mocha 'test/**/*.test.ts'",
     "typecheck": "tsc"
   },
   "engines": {
@@ -20,6 +20,7 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.13.3",
     "c8": "^12.0.0",
+    "esmock": "^2.7.6",
     "mocha": "^11.7.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0"

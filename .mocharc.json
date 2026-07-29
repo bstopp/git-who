@@ -1,6 +1,5 @@
 {
   "require": ["test/hooks.ts"],
-  "spec": "test/**/*.test.ts",
   "parallel": false,
   "reporter": "min"
 }

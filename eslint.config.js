@@ -19,6 +19,7 @@ export default [
       'max-depth': ['error', 4],
       'max-lines-per-function': ['error', 30],
       '@stylistic/quotes': ['error', 'single', { avoidEscape: true, allowTemplateLiterals: 'always' }],
+      '@stylistic/object-curly-spacing': ['error', 'always'],
     },
   },
   {
