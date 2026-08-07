@@ -1,0 +1,86 @@
+import assert from 'node:assert/strict';
+import { strict as esmock } from 'esmock';
+
+describe('utils/log.ts', () => {
+  let origConsoleError: typeof console.error;
+  let origConsoleLog: typeof console.log;
+  const stderr: string[] = [];
+  const stdout: string[] = [];
+
+  beforeEach(() => {
+    stderr.length = 0;
+    stdout.length = 0;
+    origConsoleError = console.error;
+    origConsoleLog = console.log;
+    console.error = (...args) => stderr.push(args.join(' '));
+    console.log = (...args) => stdout.push(args.join(' '));
+  })
+
+  afterEach(() => {
+    console.error = origConsoleError;
+    console.log = origConsoleLog;
+
+  })
+
+  it('logs error messages correctly', async () => {
+    const redCalls: string[] = [];
+    const log = await esmock('../../src/utils/log.ts', {
+      chalk: {
+        default: {
+          red: (msg: string) => {
+            redCalls.push(msg);
+            return msg;
+          },
+          yellow: () => {
+            assert.fail('yellow  called.');
+          },
+        },
+      },
+    });
+    log.error('something went wrong');
+    assert.deepEqual(redCalls, ['something went wrong']);
+    assert.equal(stderr.length, 1);
+    assert.equal(stderr[0], '\nsomething went wrong\n');
+    assert.equal(stdout.length, 0);
+  });
+
+  it('logs warn messages correctly', async () => {
+    const yellowCalls: string[] = [];
+    const log = await esmock('../../src/utils/log.ts', {
+      chalk: {
+        default: {
+          red: () => {
+            assert.fail('red called.');
+          },
+          yellow: (msg: string) => {
+            yellowCalls.push(msg);
+            return msg;
+          },
+        },
+      },
+    });
+    log.warn('heads up');
+    assert.deepEqual(yellowCalls, ['heads up']);
+    assert.equal(stderr.length, 1);
+    assert.equal(stderr[0], '\nheads up\n');
+    assert.equal(stdout.length, 0);
+  });
+
+  it('logs info messages correctly', async () => {
+    const log = await esmock('../../src/utils/log.ts', {
+      chalk: {
+        default: {
+          red: (msg: string) => {
+            assert.fail('red  called.');
+          },
+          yellow: () => {
+            assert.fail('yellow  called.');
+          },
+        },
+      },
+    });
+    log.info('hello world');
+    assert.equal(stderr.length, 0);
+    assert.equal(stdout[0], '\nhello world\n');
+  });
+});
