@@ -14,13 +14,12 @@ describe('utils/log.ts', () => {
     origConsoleLog = console.log;
     console.error = (...args) => stderr.push(args.join(' '));
     console.log = (...args) => stdout.push(args.join(' '));
-  })
+  });
 
   afterEach(() => {
     console.error = origConsoleError;
     console.log = origConsoleLog;
-
-  })
+  });
 
   it('logs error messages correctly', async () => {
     const redCalls: string[] = [];
@@ -70,7 +69,7 @@ describe('utils/log.ts', () => {
     const log = await esmock('../../src/utils/log.ts', {
       chalk: {
         default: {
-          red: (msg: string) => {
+          red: () => {
             assert.fail('red  called.');
           },
           yellow: () => {
