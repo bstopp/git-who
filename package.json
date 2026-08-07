@@ -24,5 +24,8 @@
     "mocha": "^11.7.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0"
+  },
+  "dependencies": {
+    "chalk": "^6.0.0"
   }
 }
