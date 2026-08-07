@@ -9,7 +9,7 @@ import {
   validateUnique,
 } from '../../src/utils/validators.ts';
 
-describe('utils/validators.js', () => {
+describe('utils/validators.ts', () => {
   describe('validateProfileName', () => {
     it('does not throw for a valid profile name', () => {
       assert.doesNotThrow(() => validateProfileName('work-.1_profile'));
