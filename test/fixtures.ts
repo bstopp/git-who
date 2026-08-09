@@ -1,4 +1,4 @@
-import { Profile, SIGNING_METHOD } from '../src/profile.js';
+import { Profile, SIGNING_METHOD } from '../src/profile.ts';
 
 export const validProfile = new Profile('work', { host: 'github-work', username: 'Bryan Stopp', email: 'bryan@work.com' });
 export const validProfileWithGpgKey = new Profile('work-gpg-signed', validProfile, { method: SIGNING_METHOD.GPG, key: '1234567890ABCDEF' });

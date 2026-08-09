@@ -70,10 +70,10 @@ describe('utils/log.ts', () => {
       chalk: {
         default: {
           red: () => {
-            assert.fail('red  called.');
+            assert.fail('red called.');
           },
           yellow: () => {
-            assert.fail('yellow  called.');
+            assert.fail('yellow called.');
           },
         },
       },
