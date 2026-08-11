@@ -8,7 +8,7 @@ export const personalProfile = new Profile('personal', { host: 'github-personal'
 export const ambiguousProfiles = [validProfile, validProfileWithGpgKey, validProfileWithSshKey];
 export const multiProfiles = [validProfile, personalProfile];
 
-export const sshKeys = ['/home/user/.ssh/id_work.pub', '/home/user/.ssh/id_personal.pub'];
+export const sshKeys = ['/home/user/.ssh/id_personal.pub', '/home/user/.ssh/id_work.pub'];
 
 export const gpgKeys = [
   { keyId: 'FEDCBA0987654321', uids: [{ name: 'Bryan Stopp', email: 'bryan@work.com' }] },

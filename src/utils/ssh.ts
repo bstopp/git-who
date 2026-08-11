@@ -59,12 +59,11 @@ export async function listSshHosts(): Promise<HostEntry[]> {
   return results;
 }
 
-
 /**
  * List SSH public key files (*.pub) found in ~/.ssh.
  */
 export async function listSshKeys() {
   const path = join(homedir(), '.ssh');
   const files = await readdir(path);
-  return files.filter((f) => f.endsWith('.pub')).map((f) => join(path, f));
+  return files.filter((f) => f.endsWith('.pub')).map((f) => join(path, f)).sort();
 }

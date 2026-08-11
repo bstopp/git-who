@@ -239,7 +239,7 @@ describe('utils/ssh.ts', () => {
 
     const homedir = { 'node:os': { homedir: () => '/home/user' } };
 
-    it('throws a clear error if checking for files fails', async () => {
+    it('propagates a readdir error unmodified', async () => {
       const { listSshKeys } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.js', {
         'node:fs/promises': {
           readFile: readFileFail(),
