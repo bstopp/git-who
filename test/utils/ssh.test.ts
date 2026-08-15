@@ -59,7 +59,7 @@ describe('utils/ssh.ts', () => {
     const homedir = { 'node:os': { homedir: () => '/home/user' } };
 
     it('propagates a read error unmodified', async () => {
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.js', {
+      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
         'node:fs/promises': {
           readFile: async () => {
             throw new Error('An Error');
@@ -71,7 +71,7 @@ describe('utils/ssh.ts', () => {
     });
 
     it('throws when config has no valid Host entries', async () => {
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.js', {
+      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
         ...fsPromises(invalidConfig),
         ...homedir,
       });
@@ -80,7 +80,7 @@ describe('utils/ssh.ts', () => {
 
     it('throws when no ssh -G succeeds', async () => {
       const logWarnCalls: string[] = [];
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.js', {
+      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
         ...fsPromises(validConfig),
         ...homedir,
         'node:util': {
@@ -104,7 +104,7 @@ describe('utils/ssh.ts', () => {
     });
 
     it('builds a single entry result', async () => {
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.js', {
+      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
         'node:fs/promises': {
           readFile: async (path: string) => {
             assert.strictEqual(path, '/home/user/.ssh/config');
@@ -126,7 +126,7 @@ describe('utils/ssh.ts', () => {
     });
 
     it('builds map of hosts & hostnames', async () => {
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.js', {
+      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
         ...fsPromises(fullConfig),
         ...homedir,
         'node:util': {
@@ -172,7 +172,7 @@ describe('utils/ssh.ts', () => {
 
     it('logs error if one fails', async () => {
       const logWarnCalls: string[] = [];
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.js', {
+      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
         ...fsPromises(validConfig),
         ...homedir,
         'node:util': {
@@ -240,7 +240,7 @@ describe('utils/ssh.ts', () => {
     const homedir = { 'node:os': { homedir: () => '/home/user' } };
 
     it('propagates a readdir error unmodified', async () => {
-      const { listSshKeys } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.js', {
+      const { listSshKeys } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
         'node:fs/promises': {
           readFile: readFileFail(),
           readdir: () => {
@@ -254,7 +254,7 @@ describe('utils/ssh.ts', () => {
 
     it('returns an empty array when there are no keys', async () => {
       const files = ['config', '.pub.foo'];
-      const { listSshKeys } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.js', {
+      const { listSshKeys } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
         ...fsPromises(files),
         ...homedir,
       });
@@ -264,7 +264,7 @@ describe('utils/ssh.ts', () => {
 
     it('returns found & filtered keys', async () => {
       const files = ['id_work.pub', 'id_personal.pub', 'config', '.pub.foo'];
-      const { listSshKeys } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.js', {
+      const { listSshKeys } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
         ...fsPromises(files),
         ...homedir,
       });

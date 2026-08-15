@@ -1,7 +1,7 @@
 import { Profile, SIGNING_METHOD } from '../src/profile.ts';
 
 export const validProfile = new Profile('work', { host: 'github-work', username: 'Bryan Stopp', email: 'bryan@work.com' });
-export const validProfileWithGpgKey = new Profile('work-gpg-signed', validProfile, { method: SIGNING_METHOD.GPG, key: '1234567890ABCDEF' });
+export const validProfileWithGpgKey = new Profile('work-gpg-signed', validProfile, { method: SIGNING_METHOD.GPG, key: 'FEDCBA0987654321' });
 export const validProfileWithSshKey = new Profile('work-ssh-signed', validProfile, { method: SIGNING_METHOD.SSH, key: '/home/user/.ssh/id_work.pub' });
 export const validProfiles = [validProfile];
 export const personalProfile = new Profile('personal', { host: 'github-personal', username: 'BStopp', email: 'bryan@personal.com' });

@@ -24,7 +24,7 @@ describe('utils/gpg.ts', () => {
 
     it('propagates other gpg failures unmodified', async () => {
       const message = 'Command failed: gpg --list-secret-keys\ngpg: keybox locked';
-      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.js', {
+      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
         'node:child_process': {
           execFileSync: () => {
             const err = new Error(message) as Error & { stderr: string };
@@ -43,7 +43,7 @@ describe('utils/gpg.ts', () => {
         'sec:u:4096:1:1234567890ABCDEF:1234567890::u:::scESC:',
         'uid:u::::1234567890::jkl::Bryan Stopp <bryan@work.com>:::::::::0:',
       ].join('\n');
-      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.js', {
+      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
         'node:child_process': {
           execFileSync: () => {
             return stdout;
@@ -63,7 +63,7 @@ describe('utils/gpg.ts', () => {
         'uid:u::::1234567890::jkl::Bryan Stopp <bryan@work.com>:::::::::0:',
         'uid:u::::1234567890::jkl::Bryan Stopp <bryan@personal.com>:::::::::0:',
       ].join('\n');
-      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.js', {
+      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
         'node:child_process': {
           execFileSync: () => {
             return stdout;
@@ -98,7 +98,7 @@ describe('utils/gpg.ts', () => {
         'uid:u::::1234567890::ghi::Jane Doe <jane@work.com>:::::::::0:',
       ].join('\n');
 
-      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.js', {
+      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
         'node:child_process': {
           execFileSync: () => {
             return stdout;
@@ -133,7 +133,7 @@ describe('utils/gpg.ts', () => {
         'uid:u::::1234567890::jkl::Bob <3 Smith <bob@x.com>:::::::::0:',
       ].join('\n');
 
-      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.js', {
+      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
         'node:child_process': {
           execFileSync: () => {
             return stdout;
@@ -159,7 +159,7 @@ describe('utils/gpg.ts', () => {
         'uid:e::::1234567890::def::Jane Doe <jane@work.com>:::::::::0:',
       ].join('\n');
 
-      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.js', {
+      const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
         'node:child_process': {
           execFileSync: () => {
             return stdout;

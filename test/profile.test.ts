@@ -27,7 +27,7 @@ describe('profile.ts', () => {
   describe('success cases', () => {
     it('constructs with valid fields', async () => {
       const actual: string[] = [];
-      const { Profile: MockedProfile } = await esmock('../src/profile.js', {
+      const { Profile: MockedProfile } = await esmock('../src/profile.ts', {
         '../src/utils/validators.js': {
           validateProfileName: (name: string) => {
             assert.equal(name, 'work');
@@ -65,7 +65,7 @@ describe('profile.ts', () => {
 
     it('constructs with valid fields & SSH Signing Key', async () => {
       const actual: string[] = [];
-      const { Profile: MockedProfile } = await esmock('../src/profile.js', {
+      const { Profile: MockedProfile } = await esmock('../src/profile.ts', {
         '../src/utils/validators.js': {
           validateProfileName: (name: string) => {
             assert.equal(name, 'work');
@@ -105,7 +105,7 @@ describe('profile.ts', () => {
 
     it('constructs with valid fields & SSH Signing Key', async () => {
       const actual: string[] = [];
-      const { Profile: MockedProfile } = await esmock('../src/profile.js', {
+      const { Profile: MockedProfile } = await esmock('../src/profile.ts', {
         '../src/utils/validators.js': {
           validateProfileName: (name: string) => {
             assert.equal(name, 'work');
