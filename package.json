@@ -26,6 +26,7 @@
     "typescript-eslint": "^8.65.0"
   },
   "dependencies": {
-    "chalk": "^6.0.0"
+    "chalk": "^6.0.0",
+    "simple-git": "^3.36.0"
   }
 }

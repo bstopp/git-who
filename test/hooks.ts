@@ -1,12 +1,14 @@
-import { unlink } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { mkdtemp, rm } from 'node:fs/promises';
 
-export const CFG_PATH = '/tmp/git-who-test.cfg.json';
-
-process.env.GIT_WHO_CFG = CFG_PATH;
+export let tmpHome = '';
 
 export const mochaHooks = {
+  beforeEach: async () => {
+    tmpHome = await mkdtemp(path.join(os.tmpdir(), 'git-who-test-'));
+  },
   afterEach: async () => {
-    process.env.GIT_WHO_CFG = CFG_PATH;
-    await unlink(CFG_PATH).catch(() => {});
+    await rm(tmpHome, { recursive: true, force: true });
   },
 };

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { strict as esmock } from 'esmock';
 import {
-  gpgKeys, personalProfile,
+  gpgKeys,
+  personalProfile,
   validProfile,
   validProfileWithGpgKey,
   validProfileWithSshKey,
