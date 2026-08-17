@@ -21,18 +21,18 @@ type GitData = {
   email: string;
 };
 
-type SigningData = {
+export type SigningData = {
   method: SigningMethod;
   key: string;
 };
 
 export class Profile {
-  name: string;
-  host: string;
-  username: string;
-  email: string;
-  signingMethod?: SigningMethod;
-  signingKey?: string;
+  readonly name: string;
+  readonly host: string;
+  readonly username: string;
+  readonly email: string;
+  readonly signingMethod?: SigningMethod;
+  readonly signingKey?: string;
 
   constructor(name: string, git: GitData, signing?: SigningData) {
     validateProfileName(name);
