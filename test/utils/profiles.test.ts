@@ -1,7 +1,8 @@
 import os from 'node:os';
 import path from 'node:path';
-import { access, chmod, constants, writeFile } from 'node:fs/promises';
+import { access, chmod, constants, readFile, writeFile } from 'node:fs/promises';
 
+import { deepEqual as propertyDeepEqual } from 'node:assert';
 import assert from 'node:assert/strict';
 import { strict as esmock } from 'esmock';
 import type { SimpleGit } from 'simple-git';
@@ -18,6 +19,10 @@ import {
   sshKeys,
 } from '../fixtures.ts';
 import { tmpHome } from '../hooks.ts';
+
+const clearUndefined = (source: Profile[]): [] => {
+  return JSON.parse(JSON.stringify(source));
+}
 
 describe('utils/profiles.ts', () => {
   let loadProfiles: ProfilesModule['loadProfiles'];
@@ -114,7 +119,15 @@ describe('utils/profiles.ts', () => {
       const dirty = [{ ...validProfile, unknown: 'value', extra: 123 }];
       await writeFile(CONFIG_PATH, JSON.stringify(dirty));
       const profiles = await loadProfiles();
-      assert.deepEqual(profiles, validProfiles);
+      assert.deepEqual(profiles, [validProfile]);
+    });
+
+    it('loads from cache if already in memory', async () => {
+      await writeFile(CONFIG_PATH, JSON.stringify(validProfiles));
+      const profiles = await loadProfiles();
+      await writeFile(CONFIG_PATH, JSON.stringify([validProfileWithSshKey]));
+      const reloaded = await loadProfiles();
+      assert.deepEqual(profiles, reloaded);
     });
   });
 
@@ -142,15 +155,22 @@ describe('utils/profiles.ts', () => {
 
     it('creates the config file with the new profile if it does not exist', async () => {
       await addProfile(validProfile);
-      const result = await loadProfiles();
-      assert.deepEqual(result, validProfiles);
+      const parsed = JSON.parse(await readFile(CONFIG_PATH, 'utf8'));
+      propertyDeepEqual(parsed, clearUndefined([validProfile]));
     });
 
     it('appends to existing profiles', async () => {
       await writeFile(CONFIG_PATH, JSON.stringify(validProfiles));
       await addProfile(personalProfile);
-      const result = await loadProfiles();
-      assert.deepEqual(result, [...validProfiles, personalProfile]);
+      const fileContents = await readFile(CONFIG_PATH, 'utf8');
+      const parsed = JSON.parse(fileContents);
+      propertyDeepEqual(parsed, clearUndefined([...validProfiles, personalProfile]));
+    });
+
+    it('appends to cache', async () => {
+      await writeFile(CONFIG_PATH, JSON.stringify(validProfiles));
+      await addProfile(personalProfile);
+      propertyDeepEqual(await loadProfiles(), [...validProfiles, personalProfile]);
     });
   });
 
@@ -181,8 +201,17 @@ describe('utils/profiles.ts', () => {
       await writeFile(CONFIG_PATH, JSON.stringify(validProfiles));
       const profile = new Profile('work', personalProfile);
       await updateProfile(validProfile, profile);
+      const fileContents = await readFile(CONFIG_PATH, 'utf8');
+      const parsed = JSON.parse(fileContents);
+      assert.deepEqual(parsed, clearUndefined([profile, validProfileWithGpgKey, validProfileWithSshKey]));
+    });
+
+    it('replaces an existing profile in cached', async () => {
+      await writeFile(CONFIG_PATH, JSON.stringify(validProfiles));
+      const profile = new Profile('work', personalProfile);
+      await updateProfile(validProfile, profile);
       const result = await loadProfiles();
-      assert.deepEqual(result, [profile]);
+      assert.deepEqual(result, [profile, validProfileWithGpgKey, validProfileWithSshKey]);
     });
   });
 
@@ -220,6 +249,14 @@ describe('utils/profiles.ts', () => {
     });
 
     it('removes an existing profile', async () => {
+      await writeFile(CONFIG_PATH, JSON.stringify(multiProfiles));
+      await removeProfile('work');
+      const fileContents = await readFile(CONFIG_PATH, 'utf8');
+      const parsed = JSON.parse(fileContents);
+      assert.deepEqual(parsed, clearUndefined([personalProfile]));
+    });
+
+    it('removes an existing profile from cache', async () => {
       await writeFile(CONFIG_PATH, JSON.stringify(multiProfiles));
       await removeProfile('work');
       const result = await loadProfiles();

@@ -6,6 +6,7 @@ import { Profile, SIGNING_METHOD, type SigningData } from '../profile.ts';
 import { listGpgKeys } from './gpg.ts';
 import { listSshKeys } from './ssh.ts';
 
+const cache: Profile[] = [];
 const CONFIG_PATH = path.join(os.homedir(), '.git-who.cfg.json');
 
 export class NoProfilesError extends Error {
@@ -56,6 +57,8 @@ async function readAndParseConfig(): Promise<unknown[]> {
 
 async function saveProfiles(profiles: Profile[]) {
   try {
+    cache.length = 0;
+    cache.push(...profiles);
     await writeFile(CONFIG_PATH, JSON.stringify(profiles, null, 2), 'utf8');
   } catch {
     throw new Error(`Config file could not be written: ${CONFIG_PATH}`);
@@ -81,6 +84,9 @@ async function applySigningConfig(git: SimpleGit, profile: Profile) {
 }
 
 export async function loadProfiles(): Promise<Profile[]> {
+  if (cache.length > 0) {
+    return [...cache];
+  }
   const parsed = await readAndParseConfig() || [];
   const profiles = parsed.map((raw) => {
     const obj = raw as Profile;
@@ -92,6 +98,7 @@ export async function loadProfiles(): Promise<Profile[]> {
   if (profiles.length === 0) {
     throw new NoProfilesError();
   }
+  cache.push(...profiles);
   return profiles;
 }
 
