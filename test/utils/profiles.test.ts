@@ -2,7 +2,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { access, chmod, constants, readFile, writeFile } from 'node:fs/promises';
 
-import { deepEqual as propertyDeepEqual } from 'node:assert';
 import assert from 'node:assert/strict';
 import { strict as esmock } from 'esmock';
 import type { SimpleGit } from 'simple-git';
@@ -22,7 +21,7 @@ import { tmpHome } from '../hooks.ts';
 
 const clearUndefined = (source: Profile[]): [] => {
   return JSON.parse(JSON.stringify(source));
-}
+};
 
 describe('utils/profiles.ts', () => {
   let loadProfiles: ProfilesModule['loadProfiles'];
@@ -129,6 +128,13 @@ describe('utils/profiles.ts', () => {
       const reloaded = await loadProfiles();
       assert.deepEqual(profiles, reloaded);
     });
+
+    it('does not duplicate profiles in the cache when loadProfiles is called concurrently', async () => {
+      await writeFile(CONFIG_PATH, JSON.stringify(validProfiles));
+      await Promise.all([loadProfiles(), loadProfiles()]); // both start before either resolves
+      const third = await loadProfiles(); // now reads from cache
+      assert.deepEqual(third, validProfiles);
+    });
   });
 
   describe('addProfiles', () => {
@@ -148,6 +154,9 @@ describe('utils/profiles.ts', () => {
       await chmod(CONFIG_PATH, 0o444);
       try {
         await assert.rejects(() => addProfile(personalProfile), { message: /^Config file could not be written: / });
+        const profiles = await loadProfiles();
+        // validate cache wasn't updated
+        assert.deepEqual(clearUndefined(profiles), clearUndefined(validProfiles));
       } finally {
         await chmod(CONFIG_PATH, 0o644);
       }
@@ -156,7 +165,7 @@ describe('utils/profiles.ts', () => {
     it('creates the config file with the new profile if it does not exist', async () => {
       await addProfile(validProfile);
       const parsed = JSON.parse(await readFile(CONFIG_PATH, 'utf8'));
-      propertyDeepEqual(parsed, clearUndefined([validProfile]));
+      assert.deepEqual(parsed, clearUndefined([validProfile]));
     });
 
     it('appends to existing profiles', async () => {
@@ -164,13 +173,13 @@ describe('utils/profiles.ts', () => {
       await addProfile(personalProfile);
       const fileContents = await readFile(CONFIG_PATH, 'utf8');
       const parsed = JSON.parse(fileContents);
-      propertyDeepEqual(parsed, clearUndefined([...validProfiles, personalProfile]));
+      assert.deepEqual(parsed, clearUndefined([...validProfiles, personalProfile]));
     });
 
     it('appends to cache', async () => {
       await writeFile(CONFIG_PATH, JSON.stringify(validProfiles));
       await addProfile(personalProfile);
-      propertyDeepEqual(await loadProfiles(), [...validProfiles, personalProfile]);
+      assert.deepEqual(await loadProfiles(), [...validProfiles, personalProfile]);
     });
   });
 
