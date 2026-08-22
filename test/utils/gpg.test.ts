@@ -7,15 +7,17 @@ describe('utils/gpg.ts', () => {
       const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
         'node:util': {
           promisify: () => async (cmd: string, args: Array<string>, opts: object) => {
-            assert.equal(cmd, 'ssh');
+            assert.equal(cmd, 'gpg');
             assert.deepEqual(args, ['--list-secret-keys', '--with-colons', '--keyid-format=long']);
             assert.deepEqual(opts, { encoding: 'utf8' });
-            throw new Error('gpg not found.');
+            const err = new Error('gpg not found.') as NodeJS.ErrnoException;
+            err.code = 'ENOENT'
+            throw err;
           },
         },
       });
-      assert.rejects(listGpgKeys(),
-        { message: 'gpg is required but was not found on PATH. Please install GnuPG.' },
+      await assert.rejects(listGpgKeys(),
+        { message: 'gpg is required but was not found on PATH. Please install.' },
       );
     });
 
@@ -30,7 +32,7 @@ describe('utils/gpg.ts', () => {
           },
         },
       });
-      assert.rejects(listGpgKeys('bryan@work.com'), { message });
+      await assert.rejects(listGpgKeys('bryan@work.com'), { message });
     });
 
     it('returns an empty array when query matches no key', async () => {

@@ -63,7 +63,7 @@ export async function listGpgKeys(query?: string): Promise<Array<GpgKey>> {
     return query ? keys.filter((key) => matchesQuery(key, query)) : keys;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new Error('gpg is required but was not found on PATH. Please install GnuPG.', { cause: error });
+      throw new Error('gpg is required but was not found on PATH. Please install.', { cause: error });
     }
     throw error;
   }}
