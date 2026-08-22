@@ -5,19 +5,16 @@ describe('utils/gpg.ts', () => {
   describe('listGpgKeys', () => {
     it('throws a clear error when gpg is not installed', async () => {
       const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
-        'node:child_process': {
-          execFileSync: (cmd: string, args: Array<string>, opts: object) => {
-            assert.equal(cmd, 'gpg');
+        'node:util': {
+          promisify: () => async (cmd: string, args: Array<string>, opts: object) => {
+            assert.equal(cmd, 'ssh');
             assert.deepEqual(args, ['--list-secret-keys', '--with-colons', '--keyid-format=long']);
             assert.deepEqual(opts, { encoding: 'utf8' });
-            const err = new Error('spawnSync gpg ENOENT') as NodeJS.ErrnoException;
-            err.code = 'ENOENT';
-            throw err;
+            throw new Error('gpg not found.');
           },
         },
       });
-      assert.throws(
-        () => listGpgKeys(),
+      assert.rejects(listGpgKeys(),
         { message: 'gpg is required but was not found on PATH. Please install GnuPG.' },
       );
     });
@@ -25,17 +22,15 @@ describe('utils/gpg.ts', () => {
     it('propagates other gpg failures unmodified', async () => {
       const message = 'Command failed: gpg --list-secret-keys\ngpg: keybox locked';
       const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
-        'node:child_process': {
-          execFileSync: () => {
+        'node:util': {
+          promisify: () => async () => {
             const err = new Error(message) as Error & { stderr: string };
             err.stderr = 'gpg: keybox locked';
             throw err;
           },
         },
       });
-      assert.throws(
-        () => listGpgKeys('bryan@work.com'), { message },
-      );
+      assert.rejects(listGpgKeys('bryan@work.com'), { message });
     });
 
     it('returns an empty array when query matches no key', async () => {
@@ -44,13 +39,13 @@ describe('utils/gpg.ts', () => {
         'uid:u::::1234567890::jkl::Bryan Stopp <bryan@work.com>:::::::::0:',
       ].join('\n');
       const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
-        'node:child_process': {
-          execFileSync: () => {
-            return stdout;
+        'node:util': {
+          promisify: () => async () => {
+            return { stdout };
           },
         },
       });
-      const actual = listGpgKeys('nobody@example.com');
+      const actual = await listGpgKeys('nobody@example.com');
       assert.deepEqual(actual, []);
     });
 
@@ -64,14 +59,14 @@ describe('utils/gpg.ts', () => {
         'uid:u::::1234567890::jkl::Bryan Stopp <bryan@personal.com>:::::::::0:',
       ].join('\n');
       const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
-        'node:child_process': {
-          execFileSync: () => {
-            return stdout;
+        'node:util': {
+          promisify: () => async () => {
+            return { stdout };
           },
         },
       });
 
-      const keys = listGpgKeys('1234567890ABCDEF');
+      const keys = await listGpgKeys('1234567890ABCDEF');
       // No Revoked
       // No Expired
       // Must have an email.
@@ -99,14 +94,14 @@ describe('utils/gpg.ts', () => {
       ].join('\n');
 
       const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
-        'node:child_process': {
-          execFileSync: () => {
-            return stdout;
+        'node:util': {
+          promisify: () => async () => {
+            return { stdout };
           },
         },
       });
 
-      const keys = listGpgKeys();
+      const keys = await listGpgKeys();
       // No Revoked
       // No Expired
       // Must have an email.
@@ -134,14 +129,14 @@ describe('utils/gpg.ts', () => {
       ].join('\n');
 
       const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
-        'node:child_process': {
-          execFileSync: () => {
-            return stdout;
+        'node:util': {
+          promisify: () => async () => {
+            return { stdout };
           },
         },
       });
 
-      const keys = listGpgKeys();
+      const keys = await listGpgKeys();
       assert.deepEqual(keys, [
         {
           keyId: '1234567890ABCDEF',
@@ -160,14 +155,14 @@ describe('utils/gpg.ts', () => {
       ].join('\n');
 
       const { listGpgKeys } = await esmock<typeof import('../../src/utils/gpg.ts')>('../../src/utils/gpg.ts', {
-        'node:child_process': {
-          execFileSync: () => {
-            return stdout;
+        'node:util': {
+          promisify: () => async () => {
+            return { stdout };
           },
         },
       });
 
-      const keys = listGpgKeys('jane@work.com');
+      const keys = await listGpgKeys('jane@work.com');
       assert.deepEqual(keys, [], 'Incorrect filtered results');
     });
   });

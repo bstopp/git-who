@@ -1,4 +1,7 @@
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 const VALID_UID = new Set(['u', 'f', 'm', 'q', '-']);
 
@@ -51,18 +54,16 @@ function matchesQuery(key: GpgKey, query: string) {
 /**
  * List the current GPG Keys on the system that match the query.
  */
-export function listGpgKeys(query?: string): Array<GpgKey> {
+export async function listGpgKeys(query?: string): Promise<Array<GpgKey>> {
   const args = ['--list-secret-keys', '--with-colons', '--keyid-format=long'];
 
-  let stdout;
   try {
-    stdout = execFileSync('gpg', args, { encoding: 'utf8' });
+    const result = await execFileAsync('gpg', args, { encoding: 'utf8' });
+    const keys = processResult(result.stdout);
+    return query ? keys.filter((key) => matchesQuery(key, query)) : keys;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       throw new Error('gpg is required but was not found on PATH. Please install GnuPG.', { cause: error });
     }
     throw error;
-  }
-  const keys = processResult(stdout);
-  return query ? keys.filter((key) => matchesQuery(key, query)) : keys;
-}
+  }}
