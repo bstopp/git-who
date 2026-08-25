@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { strict as esmock } from 'esmock';
 import { Profile, SIGNING_METHOD, type SigningMethod } from '../src/profile.ts';
 
-const validData = { host: 'github-work', username: 'Bryan Stopp', email: 'bryan@work.com' };
+const validData = { host: 'github-work', username: 'Bryan Work', email: 'bryan@work.com' };
 
 describe('profile.ts', () => {
   describe('error cases', () => {
@@ -38,7 +38,7 @@ describe('profile.ts', () => {
             actual.push('validateHost');
           },
           validateUsername: (name: string) => {
-            assert.equal(name, 'Bryan Stopp');
+            assert.equal(name, 'Bryan Work');
             actual.push('validateUsername');
           },
           validateEmail: (email: string) => {
@@ -57,7 +57,7 @@ describe('profile.ts', () => {
       const p = new MockedProfile('work', validData);
       assert.equal(p.name, 'work');
       assert.equal(p.host, 'github-work');
-      assert.equal(p.username, 'Bryan Stopp');
+      assert.equal(p.username, 'Bryan Work');
       assert.equal(p.email, 'bryan@work.com');
       assert.equal(p.signingKey, undefined);
       assert.deepEqual(actual, ['validateProfileName', 'validateHost', 'validateUsername', 'validateEmail']);
@@ -76,7 +76,7 @@ describe('profile.ts', () => {
             actual.push('validateHost');
           },
           validateUsername: (name: string) => {
-            assert.equal(name, 'Bryan Stopp');
+            assert.equal(name, 'Bryan Work');
             actual.push('validateUsername');
           },
           validateEmail: (email: string) => {
@@ -96,7 +96,7 @@ describe('profile.ts', () => {
       const p = new MockedProfile('work', validData, { method: 'ssh', key: '~/.ssh/id_ed25519.pub' });
       assert.equal(p.name, 'work');
       assert.equal(p.host, 'github-work');
-      assert.equal(p.username, 'Bryan Stopp');
+      assert.equal(p.username, 'Bryan Work');
       assert.equal(p.email, 'bryan@work.com');
       assert.equal(p.signingMethod, SIGNING_METHOD.SSH);
       assert.equal(p.signingKey, '~/.ssh/id_ed25519.pub');
@@ -116,7 +116,7 @@ describe('profile.ts', () => {
             actual.push('validateHost');
           },
           validateUsername: (name: string) => {
-            assert.equal(name, 'Bryan Stopp');
+            assert.equal(name, 'Bryan Work');
             actual.push('validateUsername');
           },
           validateEmail: (email: string) => {
@@ -136,7 +136,7 @@ describe('profile.ts', () => {
       const p = new MockedProfile('work', validData, { method: 'gpg', key: 'ABCDEFGHIJKLMN12345' });
       assert.equal(p.name, 'work');
       assert.equal(p.host, 'github-work');
-      assert.equal(p.username, 'Bryan Stopp');
+      assert.equal(p.username, 'Bryan Work');
       assert.equal(p.email, 'bryan@work.com');
       assert.equal(p.signingMethod, SIGNING_METHOD.GPG);
       assert.equal(p.signingKey, 'ABCDEFGHIJKLMN12345');
@@ -148,7 +148,7 @@ describe('profile.ts', () => {
       assert.deepEqual(JSON.parse(JSON.stringify(p)), {
         name: 'work',
         host: 'github-work',
-        username: 'Bryan Stopp',
+        username: 'Bryan Work',
         email: 'bryan@work.com',
       });
     });
@@ -158,7 +158,7 @@ describe('profile.ts', () => {
       assert.deepEqual(JSON.parse(JSON.stringify(p)), {
         name: 'work',
         host: 'github-work',
-        username: 'Bryan Stopp',
+        username: 'Bryan Work',
         email: 'bryan@work.com',
         signingMethod: 'ssh',
         signingKey: '~/.ssh/id_ed25519.pub',
@@ -170,7 +170,7 @@ describe('profile.ts', () => {
       assert.deepEqual(JSON.parse(JSON.stringify(p)), {
         name: 'work',
         host: 'github-work',
-        username: 'Bryan Stopp',
+        username: 'Bryan Work',
         email: 'bryan@work.com',
         signingMethod: 'gpg',
         signingKey: 'ABCDEFGHIJKLMN12345',

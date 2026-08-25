@@ -44,7 +44,7 @@ describe('utils/display.ts', async () => {
     const output = logInfoCalls.join('\n');
     assert.ok(output.match(/\[Bold]Profile:\[\/Bold]\s+work/));
     assert.ok(output.match(/\[Bold]Host:\[\/Bold]\s+github-work/));
-    assert.ok(output.match(/\[Bold]Name:\[\/Bold]\s+Bryan Stopp/));
+    assert.ok(output.match(/\[Bold]Name:\[\/Bold]\s+Bryan Work/));
     assert.ok(output.match(/\[Bold]Email:\[\/Bold]\s+bryan@work.com/));
     assert.ok(output.match(/\[Bold]Sign Commits:\[\/Bold]\sNo/));
     assert.ok(!output.match(/Signing Key/));
@@ -71,7 +71,7 @@ describe('utils/display.ts', async () => {
     printProfile(validProfileWithGpgKey, { signingKeyStatus });
     const output = logInfoCalls.join('\n');
     assert.ok(output.match(/\[Bold]Sign Commits:\[\/Bold]\s+Using gpg/));
-    assert.ok(output.match(/\[Bold]Signing Key:\[\/Bold]\s+FEDCBA0987654321, Bryan Stopp \(bryan@work.com\)/));
+    assert.ok(output.match(/\[Bold]Signing Key:\[\/Bold]\s+FEDCBA0987654321, Bryan Work \(bryan@work.com\)/));
   });
 
   it('displays not found gpg signing key with single uid on one line', async () => {
@@ -79,7 +79,7 @@ describe('utils/display.ts', async () => {
     printProfile(validProfileWithGpgKey, { signingKeyStatus });
     const output = logInfoCalls.join('\n');
     assert.ok(output.match(/\[Bold]Sign Commits:\[\/Bold]\s+Using gpg/));
-    assert.ok(output.match(/\[Bold]Signing Key:\[\/Bold]\s+\[Yellow]FEDCBA0987654321, Bryan Stopp \(bryan@work.com\) \(not found\)\[\/Yellow]/));
+    assert.ok(output.match(/\[Bold]Signing Key:\[\/Bold]\s+\[Yellow]FEDCBA0987654321, Bryan Work \(bryan@work.com\) \(not found\)\[\/Yellow]/));
   });
 
   it('displays gpg signing key with multiple uids on separate indented lines', async () => {
@@ -88,8 +88,8 @@ describe('utils/display.ts', async () => {
     const output = logInfoCalls.join('\n');
     assert.ok(output.match(/\[Bold]Sign Commits:\[\/Bold]\sUsing gpg/));
     assert.ok(output.match(/\[Bold]Signing Key:\[\/Bold]\s+FEDCBA0987654321\n/));
-    assert.ok(output.match(/\s+Bryan Stopp \(bryan@work.com\)\n?/));
-    assert.ok(output.match(/\s+Bryan Stopp \(bryan@personal.com\)\n?/));
+    assert.ok(output.match(/\s+Bryan Work \(bryan@work.com\)\n?/));
+    assert.ok(output.match(/\s+Bryan Personal \(bryan@personal.com\)\n?/));
   });
 
   it('displays not found gpg signing key with multiple uids on separate indented lines', async () => {
@@ -98,8 +98,8 @@ describe('utils/display.ts', async () => {
     const output = logInfoCalls.join('\n');
     assert.ok(output.match(/\[Bold]Sign Commits:\[\/Bold]\sUsing gpg/));
     assert.ok(output.match(/\[Bold]Signing Key:\[\/Bold]\s+\[Yellow]FEDCBA0987654321\n/));
-    assert.ok(output.match(/\s+Bryan Stopp \(bryan@work.com\)/));
-    assert.ok(output.match(/\s+Bryan Stopp \(bryan@personal.com\)/));
+    assert.ok(output.match(/\s+Bryan Work \(bryan@work.com\)/));
+    assert.ok(output.match(/\s+Bryan Personal \(bryan@personal.com\)/));
     assert.ok(output.match(/\(not found\)\[\/Yellow]$/));
   });
 
@@ -120,7 +120,7 @@ describe('utils/display.ts', async () => {
     const opts = { signingKeyStatus, mismatches };
     printProfile(validProfile, opts);
     const output = logInfoCalls.join('\n');
-    assert.ok(output.match(/\[Bold]Name:\[\/Bold]\s+\[Yellow]Bryan Stopp \*\[\/Yellow]/));
+    assert.ok(output.match(/\[Bold]Name:\[\/Bold]\s+\[Yellow]Bryan Work \*\[\/Yellow]/));
     assert.ok(output.match(/\[Bold]Email:\[\/Bold]\s+\[Yellow]bryan@work.com \*\[\/Yellow]/));
     const warnings = logWarnCalls.join('\n');
     assert.ok(warnings.match(/Git config does not match profile.*username=BStopp.*email=bryan@personal.com/));
@@ -135,7 +135,7 @@ describe('utils/display.ts', async () => {
     const opts = { signingKeyStatus, mismatches };
     printProfile(validProfile, opts);
     const output = logInfoCalls.join('\n');
-    assert.ok(output.match(/\[Bold]Name:\[\/Bold]\s+\[Yellow]Bryan Stopp \*\[\/Yellow]/));
+    assert.ok(output.match(/\[Bold]Name:\[\/Bold]\s+\[Yellow]Bryan Work \*\[\/Yellow]/));
     assert.ok(output.match(/\[Bold]Email:\[\/Bold]\s+\[Yellow]bryan@work.com \*\[\/Yellow]/));
     const warnings = logWarnCalls.join('\n');
     assert.ok(warnings.match(/Git config does not match profile.*username=.*email=/));
