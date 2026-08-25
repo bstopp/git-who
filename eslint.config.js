@@ -14,6 +14,10 @@ export default [
   {
     rules: {
       '@typescript-eslint/no-shadow': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+      }],
       curly: 'error',
       complexity: ['error', 10],
       'max-depth': ['error', 4],
