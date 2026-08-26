@@ -3,7 +3,7 @@ import path from 'node:path';
 import { access, constants, readFile, writeFile } from 'node:fs/promises';
 import type { SimpleGit } from 'simple-git';
 import { Profile, SIGNING_METHOD, type SigningData } from '../profile.ts';
-import { listGpgKeys } from './gpg.ts';
+import { type GpgKey, listGpgKeys } from './gpg.ts';
 import { listSshKeys } from './ssh.ts';
 
 let cache: Promise<Profile[]> | undefined;
@@ -165,7 +165,8 @@ export async function getActiveProfileName(git: SimpleGit) {
 export async function applyProfile(git: SimpleGit, profile: Profile, originUrl?: string) {
   if (profile.signingKey !== undefined) {
     if (profile.signingMethod === SIGNING_METHOD.GPG) {
-      if (listGpgKeys(profile.signingKey).length === 0) {
+      const keys: GpgKey[] = await listGpgKeys(profile.signingKey);
+      if (keys.length === 0) {
         throw new SigningKeyNotFoundError(`GPG key '${profile.signingKey}' not found for profile '${profile.name}'.`);
       }
     } else if (profile.signingMethod === SIGNING_METHOD.SSH) {

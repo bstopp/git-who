@@ -5,7 +5,7 @@ const execFileAsync = promisify(execFile);
 
 const VALID_UID = new Set(['u', 'f', 'm', 'q', '-']);
 
-type Uid = { name: string; email: string };
+export type Uid = { name: string; email: string };
 export type GpgKey = { keyId: string; uids: Array<Uid> };
 
 function parseUid(line: string) {
@@ -66,4 +66,5 @@ export async function listGpgKeys(query?: string): Promise<Array<GpgKey>> {
       throw new Error('gpg is required but was not found on PATH. Please install.', { cause: error });
     }
     throw error;
-  }}
+  }
+}
