@@ -7,7 +7,7 @@ const fakeGit = {} as SimpleGit;
 
 describe('commands/list.ts', async () => {
   it('passes through loadProfiles failures', async () => {
-    const { list } = await esmock<typeof import('../../src/commands/list.ts')>('../../src/commands/list.ts', {
+    const { default: list } = await esmock<typeof import('../../src/commands/list.ts')>('../../src/commands/list.ts', {
       '../../src/utils/profiles.ts': {
         loadProfiles: async () => {
           throw new Error('config is corrupt');
@@ -22,7 +22,7 @@ describe('commands/list.ts', async () => {
 
   it('prints all profiles', async () => {
     let logInfo: string = '';
-    const { list } = await esmock<typeof import('../../src/commands/list.ts')>('../../src/commands/list.ts', {
+    const { default: list } = await esmock<typeof import('../../src/commands/list.ts')>('../../src/commands/list.ts', {
       '../../src/utils/profiles.ts': {
         loadProfiles: async () => ambiguousProfiles,
         getActiveProfileName: async (git: SimpleGit) => {
@@ -57,7 +57,7 @@ describe('commands/list.ts', async () => {
 
   it('highlights active profile via gitwho.profile', async () => {
     let logInfo: string = '';
-    const { list } = await esmock<typeof import('../../src/commands/list.ts')>('../../src/commands/list.ts', {
+    const { default: list } = await esmock<typeof import('../../src/commands/list.ts')>('../../src/commands/list.ts', {
       '../../src/utils/profiles.ts': {
         loadProfiles: async () => ambiguousProfiles,
         getActiveProfileName: async (git: SimpleGit) => {

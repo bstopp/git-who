@@ -3,7 +3,7 @@ import { simpleGit } from 'simple-git';
 import log from '../utils/log.ts';
 import { loadProfiles, getActiveProfileName } from '../utils/profiles.ts';
 
-export async function list() {
+export default async function list() {
   const profiles = await loadProfiles();
   const activeName = await getActiveProfileName(simpleGit());
   const lines = profiles.map((p) => {
