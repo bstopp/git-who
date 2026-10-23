@@ -21,6 +21,16 @@ import * as validators from '../../src/utils/validators.ts';
 import { Profile, SIGNING_METHOD } from '../../src/profile.ts';
 
 describe('utils/prompts.ts', () => {
+  const logFail = {
+    '../../src/utils/log.ts': {
+      default: {
+        info: () => {
+          assert.fail('log info should not be called.');
+        },
+      },
+    },
+  };
+
   describe('prompt', () => {
     const loadProfiles = {
       '../../src/utils/profiles.ts': {
@@ -32,6 +42,7 @@ describe('utils/prompts.ts', () => {
         let validateProfileNameCalled = false;
         let validateUniqueCalled = false;
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '../../src/utils/validators.ts': {
             ...validators,
@@ -64,6 +75,7 @@ describe('utils/prompts.ts', () => {
       it('validates username', async () => {
         let validateUsernameCalled = false;
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '../../src/utils/validators.ts': {
             ...validators,
@@ -104,6 +116,7 @@ describe('utils/prompts.ts', () => {
       it('validates email', async () => {
         let validateEmailCalled = false;
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '../../src/utils/validators.ts': {
             ...validators,
@@ -136,6 +149,7 @@ describe('utils/prompts.ts', () => {
     describe('prompting flow', () => {
       it('converts validation throws to inquirer messages', async () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '@inquirer/select': {
             default: async () => {
@@ -163,6 +177,7 @@ describe('utils/prompts.ts', () => {
 
       it('propagates the error when user presses Ctrl+C during a prompt', async () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '@inquirer/input': {
             default: async () => {
@@ -175,6 +190,7 @@ describe('utils/prompts.ts', () => {
 
       it('propagates errors when listSshHosts throws', async () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '../../src/utils/ssh.ts': {
             listSshHosts: () => {
@@ -193,6 +209,7 @@ describe('utils/prompts.ts', () => {
 
       it('propagates errors when gpg but listGpgKeys throws', async () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '../../src/utils/ssh.ts': {
             listSshHosts: () => sshHosts,
@@ -224,6 +241,7 @@ describe('utils/prompts.ts', () => {
 
       it('throws when gpg but no keys exist', async () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '../../src/utils/ssh.ts': {
             listSshHosts: () => sshHosts,
@@ -253,6 +271,7 @@ describe('utils/prompts.ts', () => {
 
       it('throws when ssh but no keys exist', async () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '../../src/utils/ssh.ts': {
             listSshHosts: () => sshHosts,
@@ -282,6 +301,7 @@ describe('utils/prompts.ts', () => {
 
       it('creates a minimum profile', async () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '../../src/utils/ssh.ts': {
             listSshHosts: () => sshHosts,
@@ -337,6 +357,7 @@ describe('utils/prompts.ts', () => {
 
       it('creates a profile with ssh signing', async () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '../../src/utils/ssh.ts': {
             listSshHosts: () => sshHosts,
@@ -392,6 +413,7 @@ describe('utils/prompts.ts', () => {
 
       it('creates a profile with gpg signing', async () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '../../src/utils/ssh.ts': {
             listSshHosts: () => sshHosts,
@@ -595,7 +617,9 @@ describe('utils/prompts.ts', () => {
       });
 
       it('prepopulates when provided a profile (gpg)', async () => {
+        const logInfo: string[] = [];
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          '../../src/utils/log.ts': { info: (msg: string) => logInfo.push(msg) },
           ...loadProfiles,
           '../../src/utils/ssh.ts': {
             listSshHosts: () => sshHosts,
@@ -664,10 +688,12 @@ describe('utils/prompts.ts', () => {
             key: 'FEDCBA0987654321',
           }),
         );
+        assert.deepEqual(logInfo, ['Using identity: Bryan Work (bryan@work.com)']);
       });
 
       it('prepopulates when provided a profile (ssh)', async () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
           ...loadProfiles,
           '../../src/utils/ssh.ts': {
             listSshHosts: () => sshHosts,

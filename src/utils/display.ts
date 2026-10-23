@@ -2,8 +2,8 @@ import chalk from 'chalk';
 import log from './log.ts';
 import { Profile } from '../profile.ts';
 
-export const PROFILE_FIELDS = { USERNAME: 'username', EMAIL: 'email' } as const;
-type ProfileField = (typeof PROFILE_FIELDS)[keyof typeof PROFILE_FIELDS]; // 'name' | 'email'
+export const PROFILE_FIELDS = { USERNAME: 'username', EMAIL: 'email', SIGNING_KEY: 'signingKey', SIGNING_METHOD: 'signingMethod' } as const;
+type ProfileField = (typeof PROFILE_FIELDS)[keyof typeof PROFILE_FIELDS];
 export type ProfileMismatches = Partial<Record<ProfileField, string>>;
 export type GpgUids = Array<{ name: string; email: string }>;
 export type SigningKeyStatus = { found: boolean; uids?: GpgUids };

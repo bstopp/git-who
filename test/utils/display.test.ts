@@ -123,7 +123,7 @@ describe('utils/display.ts', async () => {
     assert.ok(output.match(/\[Bold]Name:\[\/Bold]\s+\[Yellow]Bryan Work \*\[\/Yellow]/));
     assert.ok(output.match(/\[Bold]Email:\[\/Bold]\s+\[Yellow]bryan@work.com \*\[\/Yellow]/));
     const warnings = logWarnCalls.join('\n');
-    assert.ok(warnings.match(/Git config does not match profile.*username=BStopp.*email=bryan@personal.com/));
+    assert.ok(warnings.match(/Git config does not match profile.*username=Bryan Personal.*email=bryan@personal.com/));
   });
 
   it('flags missing fields with * and logs a warning', async () => {
