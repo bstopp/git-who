@@ -28,6 +28,7 @@
     "typescript-eslint": "^8.65.0"
   },
   "dependencies": {
+    "@inquirer/confirm": "^6.3.5",
     "@inquirer/input": "^5.1.2",
     "@inquirer/select": "^5.2.1",
     "chalk": "^6.0.0",

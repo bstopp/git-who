@@ -1,10 +1,3 @@
-import { ExitPromptError } from '@inquirer/core';
-import realInput from '@inquirer/input';
-import realSelect from '@inquirer/select';
-
-type InputArgs = Parameters<typeof realInput>; // [InputConfig, Context?]
-type SelectArgs = Parameters<typeof realSelect>;
-
 import assert from 'node:assert/strict';
 import { strict as esmock } from 'esmock';
 import { render } from '@inquirer/testing';
@@ -19,6 +12,14 @@ import {
 } from '../fixtures.ts';
 import * as validators from '../../src/utils/validators.ts';
 import { Profile, SIGNING_METHOD } from '../../src/profile.ts';
+import { NoProfilesError } from '../../src/utils/profiles.ts';
+
+import { ExitPromptError } from '@inquirer/core';
+import realInput from '@inquirer/input';
+import realSelect from '@inquirer/select';
+
+type InputArgs = Parameters<typeof realInput>; // [InputConfig, Context?]
+type SelectArgs = Parameters<typeof realSelect>;
 
 describe('utils/prompts.ts', () => {
   const logFail = {
@@ -35,6 +36,7 @@ describe('utils/prompts.ts', () => {
     const loadProfiles = {
       '../../src/utils/profiles.ts': {
         loadProfiles: () => Promise.resolve(validProfiles),
+        NoProfilesError: NoProfilesError,
       },
     };
     describe('prompt validations', () => {
@@ -147,6 +149,19 @@ describe('utils/prompts.ts', () => {
     });
 
     describe('prompting flow', () => {
+      it('rethrows error when loadProfiles throws a non-NoProfilesError', async () => {
+        const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
+          '../../src/utils/profiles.ts': {
+            loadProfiles: async () => {
+              throw new Error('Could not open Profiles file.');
+            },
+            NoProfilesError: NoProfilesError,
+          },
+        });
+        await assert.rejects(pf(), { message: 'Could not open Profiles file.' });
+      });
+
       it('converts validation throws to inquirer messages', async () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
           ...logFail,
@@ -303,6 +318,67 @@ describe('utils/prompts.ts', () => {
         const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
           ...logFail,
           ...loadProfiles,
+          '../../src/utils/ssh.ts': {
+            listSshHosts: () => sshHosts,
+            listSshKeys: () => [],
+          },
+          '@inquirer/input': {
+            default: async (config: InputArgs[0], context: InputArgs[1]) => {
+              const { answer, events } = await render(realInput, config, context);
+              if (config.message === 'Profile name:') {
+                assert.equal(config.default, undefined);
+                events.type('profile-name');
+                events.keypress('enter');
+                return answer;
+              } else if (config.message === 'Git user.name:') {
+                assert.equal(config.default, undefined);
+                events.type('Git Username');
+                events.keypress('enter');
+                return answer;
+              } else if (config.message === 'Git user.email:') {
+                assert.equal(config.default, undefined);
+                events.type('email@git.com');
+                events.keypress('enter');
+                return answer;
+              }
+              assert.fail('Unknown input prompt: ' + config.message);
+            },
+          },
+          '@inquirer/select': {
+            default: async (config: SelectArgs[0], context: SelectArgs[1]) => {
+              if (config.message === 'SSH Host:') {
+                const { answer, events, getScreen } = await render(realSelect, config, context);
+                const screen = getScreen();
+                assert.match(screen, /github-work\s\(github.com\)/i);
+                assert.match(screen, /github-personal\s\(github.com\)/i);
+                events.keypress('enter');
+                return answer;
+              } else if (config.message === 'Sign Commits?') {
+                return 'no';
+              }
+              assert.fail('Unknown select prompt: ' + config.message);
+            },
+          },
+        });
+        const profile = await pf();
+        assert.deepEqual(profile,
+          new Profile('profile-name', {
+            host: 'github-personal',
+            username: 'Git Username',
+            email: 'email@git.com',
+          }),
+        );
+      });
+
+      it('continues if a NoProfilesError is thrown by loadProfiles', async () => {
+        const { prompt: pf } = await esmock('../../src/utils/prompts.ts', {
+          ...logFail,
+          '../../src/utils/profiles.ts': {
+            loadProfiles: async () => {
+              throw new NoProfilesError();
+            },
+            NoProfilesError: NoProfilesError,
+          },
           '../../src/utils/ssh.ts': {
             listSshHosts: () => sshHosts,
             listSshKeys: () => [],

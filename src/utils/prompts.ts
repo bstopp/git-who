@@ -11,9 +11,20 @@ import {
   validateUsername,
   validateEmail,
 } from './validators.ts';
-import { loadProfiles } from './profiles.ts';
+import { loadProfiles, NoProfilesError } from './profiles.ts';
 
 type Validator = (value: string) => void;
+
+async function loadExistingProfiles(): Promise<Profile[]> {
+  try {
+    return await loadProfiles();
+  } catch (err) {
+    if (err instanceof NoProfilesError) {
+      return [];
+    }
+    throw err;
+  }
+}
 
 function inquirerValidate(fn: Validator) {
   function validate(value: string): boolean | string {
@@ -152,7 +163,7 @@ async function promptSignCommits(editing: Profile | undefined) {
 }
 
 export async function prompt(editing?: Profile): Promise<Profile> {
-  const existing = await loadProfiles();
+  const existing = await loadExistingProfiles();
   const name = await nameInput(existing, editing?.name);
   const host = await hostInput(editing?.host);
   const { signingData, uid } = await promptSignCommits(editing);
