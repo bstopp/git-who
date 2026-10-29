@@ -177,8 +177,8 @@ describe('utils/prompts.ts', () => {
     'Git user.email:': pick('ignored'),
   });
 
-  const loadPrompt = async (overrides: Mocks = {}) => {
-    const { prompt } = await esmock<typeof import('../../src/utils/prompts.ts')>(
+  const loadPromptForProfile = async (overrides: Mocks = {}) => {
+    const { promptForProfile } = await esmock<typeof import('../../src/utils/prompts.ts')>(
       '../../src/utils/prompts.ts',
       {
         ...logFail,
@@ -190,7 +190,7 @@ describe('utils/prompts.ts', () => {
         ...overrides, // same key wins, so it replaces the default
       },
     );
-    return prompt;
+    return promptForProfile;
   };
 
   beforeEach(() => {
@@ -198,12 +198,12 @@ describe('utils/prompts.ts', () => {
     logInfo = [];
   });
 
-  describe('prompt', () => {
-    describe('prompt validations', () => {
+  describe('promptForProfile', () => {
+    describe('validations', () => {
       it('validates profile name', async () => {
         let validateProfileNameCalled = false;
         let validateUniqueCalled = false;
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...validatorsMock({
             validateProfileName: () => {
               validateProfileNameCalled = true;
@@ -215,14 +215,14 @@ describe('utils/prompts.ts', () => {
           ...selectMock({ 'SSH Host:': exitPrompt }),
           ...inputMock({ 'Profile name:': answerInput('personal') }),
         });
-        await assert.rejects(prompt(), ExitPromptError);
+        await assert.rejects(promptForProfile(), ExitPromptError);
         assert.ok(validateProfileNameCalled, 'validateProfileName not called');
         assert.ok(validateUniqueCalled, 'validateUnique not called');
       });
 
       it('validates username', async () => {
         let validateUsernameCalled = false;
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...validatorsMock({
             validateUsername: () => {
               validateUsernameCalled = true;
@@ -238,13 +238,13 @@ describe('utils/prompts.ts', () => {
             'Git user.email:': exitPrompt,
           }),
         });
-        await assert.rejects(prompt());
+        await assert.rejects(promptForProfile());
         assert.ok(validateUsernameCalled, 'validateUsername not called');
       });
 
       it('validates email', async () => {
         let validateEmailCalled = false;
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...validatorsMock({
             validateEmail: () => {
               validateEmailCalled = true;
@@ -260,7 +260,7 @@ describe('utils/prompts.ts', () => {
             'Git user.email:': answerInput('foobar@example.com'),
           }),
         });
-        const profile = await prompt();
+        const profile = await promptForProfile();
         assert.equal(profile.email, 'foobar@example.com');
         assert.ok(validateEmailCalled, 'validateEmail not called');
       });
@@ -287,12 +287,12 @@ describe('utils/prompts.ts', () => {
 
       it('rethrows error when loadProfiles throws a non-NoProfilesError', async () => {
         loadProfilesError = new Error('Could not open Profiles file.');
-        const prompt = await loadPrompt();
-        await assert.rejects(prompt(), { message: 'Could not open Profiles file.' });
+        const promptForProfile = await loadPromptForProfile();
+        await assert.rejects(promptForProfile(), { message: 'Could not open Profiles file.' });
       });
 
       it('converts validation throws to inquirer messages', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...selectMock({ 'SSH Host:': exitPrompt }),
           ...inputMock({
             'Profile name:': async (config, context) => {
@@ -310,18 +310,18 @@ describe('utils/prompts.ts', () => {
             },
           }),
         });
-        await assert.rejects(prompt(), ExitPromptError);
+        await assert.rejects(promptForProfile(), ExitPromptError);
       });
 
       it('propagates the error when user presses Ctrl+C during a prompt', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...inputMock({ 'Profile name:': exitPrompt }),
         });
-        await assert.rejects(prompt(), ExitPromptError);
+        await assert.rejects(promptForProfile(), ExitPromptError);
       });
 
       it('propagates errors when listSshHosts throws', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           '../../src/utils/ssh.ts': {
             listSshHosts: () => {
               throw new Error('no hosts');
@@ -330,11 +330,11 @@ describe('utils/prompts.ts', () => {
           },
           ...inputMock({ 'Profile name:': pick('') }),
         });
-        await assert.rejects(prompt(), { message: 'no hosts' });
+        await assert.rejects(promptForProfile(), { message: 'no hosts' });
       });
 
       it('propagates errors when gpg but listGpgKeys throws', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           '../../src/utils/gpg.ts': {
             listGpgKeys: () => {
               throw new Error('gpg locked');
@@ -346,11 +346,11 @@ describe('utils/prompts.ts', () => {
           }),
           ...ignoredInputs,
         });
-        await assert.rejects(prompt(), { message: 'gpg locked' });
+        await assert.rejects(promptForProfile(), { message: 'gpg locked' });
       });
 
       it('throws when gpg but no keys exist', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...gpgKeysMock([]),
           ...selectMock({
             'SSH Host:': pick('github-work'),
@@ -358,11 +358,11 @@ describe('utils/prompts.ts', () => {
           }),
           ...ignoredInputs,
         });
-        await assert.rejects(prompt(), { message: 'No GPG keys found on this system.' });
+        await assert.rejects(promptForProfile(), { message: 'No GPG keys found on this system.' });
       });
 
       it('throws when ssh but no keys exist', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...sshKeysMock([]),
           ...selectMock({
             'SSH Host:': pick('github-work'),
@@ -370,22 +370,22 @@ describe('utils/prompts.ts', () => {
           }),
           ...ignoredInputs,
         });
-        await assert.rejects(prompt(), { message: 'No SSH keys found on this system.' });
+        await assert.rejects(promptForProfile(), { message: 'No SSH keys found on this system.' });
       });
 
       it('creates a minimum profile', async () => {
-        const prompt = await loadPrompt(minimumFlowMocks);
-        assert.deepEqual(await prompt(), minimumProfile);
+        const promptForProfile = await loadPromptForProfile(minimumFlowMocks);
+        assert.deepEqual(await promptForProfile(), minimumProfile);
       });
 
       it('continues if a NoProfilesError is thrown by loadProfiles', async () => {
         loadProfilesError = new NoProfilesError();
-        const prompt = await loadPrompt(minimumFlowMocks);
-        assert.deepEqual(await prompt(), minimumProfile);
+        const promptForProfile = await loadPromptForProfile(minimumFlowMocks);
+        assert.deepEqual(await promptForProfile(), minimumProfile);
       });
 
       it('creates a profile with ssh signing', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...sshKeysMock(sshKeys),
           ...inputMock({
             'Profile name:': pick('profile-name'),
@@ -398,7 +398,7 @@ describe('utils/prompts.ts', () => {
             'Select an SSH key:': selectChoice({ screen: sshKeyScreen, keys: ['down'] }),
           }),
         });
-        assert.deepEqual(await prompt(),
+        assert.deepEqual(await promptForProfile(),
           new Profile(
             'profile-name',
             {
@@ -415,7 +415,7 @@ describe('utils/prompts.ts', () => {
       });
 
       it('creates a profile with gpg signing', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...gpgKeysMock(gpgKeys),
           ...inputMock({
             'Profile name:': pick('github-personal'),
@@ -429,7 +429,7 @@ describe('utils/prompts.ts', () => {
             'Select an identity:': selectChoice({ screen: identityScreen }),
           }),
         });
-        assert.deepEqual(await prompt(),
+        assert.deepEqual(await promptForProfile(),
           new Profile(
             'github-personal',
             {
@@ -446,7 +446,7 @@ describe('utils/prompts.ts', () => {
       });
 
       it('skips identity prompt when gpg key only has one', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...logMock,
           ...gpgKeysMock(gpgKeys),
           ...inputMock({
@@ -461,7 +461,7 @@ describe('utils/prompts.ts', () => {
             'Select an identity:': async () => assert.fail('Select an identity should not have been prompted.'),
           }),
         });
-        assert.deepEqual(await prompt(),
+        assert.deepEqual(await promptForProfile(),
           new Profile(
             'github-work',
             {
@@ -479,7 +479,7 @@ describe('utils/prompts.ts', () => {
       });
 
       it('skips gpg key prompt when gpg key only has one', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...logMock,
           ...gpgKeysMock([gpgKeys[1]]),
           ...inputMock({
@@ -494,7 +494,7 @@ describe('utils/prompts.ts', () => {
             'Select an identity:': selectChoice({ screen: identityScreen }),
           }),
         });
-        assert.deepEqual(await prompt(),
+        assert.deepEqual(await promptForProfile(),
           new Profile(
             'github-personal',
             {
@@ -512,7 +512,7 @@ describe('utils/prompts.ts', () => {
       });
 
       it('prepopulates when provided a profile (gpg)', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...logMock,
           ...gpgKeysMock(gpgKeys),
           ...inputMock({
@@ -526,7 +526,7 @@ describe('utils/prompts.ts', () => {
             'Select a GPG key:': selectChoice({ default: 'FEDCBA0987654321', screen: gpgKeyScreen }),
           }),
         });
-        assert.deepEqual(await prompt(validProfileWithGpgKey),
+        assert.deepEqual(await promptForProfile(validProfileWithGpgKey),
           new Profile('profile-name', {
             host: 'github-personal',
             username: 'Git Username',
@@ -540,7 +540,7 @@ describe('utils/prompts.ts', () => {
       });
 
       it('prepopulates when provided a profile (ssh)', async () => {
-        const prompt = await loadPrompt({
+        const promptForProfile = await loadPromptForProfile({
           ...sshKeysMock(sshKeys),
           ...inputMock({
             'Profile name:': answerInput('profile-name', 'work-ssh-signed'),
@@ -553,7 +553,7 @@ describe('utils/prompts.ts', () => {
             'Select an SSH key:': selectChoice({ default: '/home/user/.ssh/id_work.pub', screen: sshKeyScreen }),
           }),
         });
-        assert.deepEqual(await prompt(validProfileWithSshKey),
+        assert.deepEqual(await promptForProfile(validProfileWithSshKey),
           new Profile('profile-name', {
             host: 'github-personal',
             username: 'Git Username',

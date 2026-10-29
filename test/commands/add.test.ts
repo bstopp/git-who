@@ -31,7 +31,7 @@ describe('commands/add.ts', () => {
 
   const promptsMock = {
     '../../src/utils/prompts.ts': {
-      prompt: async (editing?: Profile) => {
+      promptForProfile: async (editing?: Profile) => {
         assert.equal(editing, undefined);
         return personalProfile;
       },

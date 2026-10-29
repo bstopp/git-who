@@ -162,7 +162,7 @@ async function promptSignCommits(editing: Profile | undefined) {
   return { signingData, uid };
 }
 
-export async function prompt(editing?: Profile): Promise<Profile> {
+export async function promptForProfile(editing?: Profile): Promise<Profile> {
   const existing = await loadExistingProfiles();
   const name = await nameInput(existing, editing?.name);
   const host = await hostInput(editing?.host);
