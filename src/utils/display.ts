@@ -24,24 +24,36 @@ function buildSigningKey(signingKey: string, signingStatus?: SigningKeyStatus) {
     : keyText;
 }
 
-export function printProfile(profile: Profile, opts?: { signingKeyStatus?: SigningKeyStatus; mismatches?: ProfileMismatches }): void {
+const signingText = (method?: string) => method ? `Using ${method}` : 'No';
+const specifiedOrNot = (key?: string) => key || 'Not Specified';
+
+// Appends the original value of a field when it differs from the current one.
+const wasSuffix = (
+  oldVal: string | undefined,
+  newVal: string | undefined,
+  format: (value?: string) => string = (value) => `${value}`,
+  separator = ' ',
+) => oldVal === newVal ? '' : `${separator}(was: ${format(oldVal)})`;
+
+export function printProfile(profile: Profile, opts?: { signingKeyStatus?: SigningKeyStatus; mismatches?: ProfileMismatches; original?: Profile }): void {
   const signingStatus = opts?.signingKeyStatus;
   const mismatches = opts?.mismatches;
+  const prev = opts?.original ?? profile; // compared with itself, so nothing is annotated without an original
 
   const label = (s: string) => chalk.bold(s + ':');
   const field = (key: ProfileField, val: string) => {
     return key in (mismatches ?? {}) ? chalk.yellow(`${val} *`) : val;
   };
   const lines = [
-    `${label('Profile')}      ${profile.name}`,
-    `${label('Host')}         ${profile.host}`,
-    `${label('Name')}         ${field(PROFILE_FIELDS.USERNAME, profile.username)}`,
-    `${label('Email')}        ${field(PROFILE_FIELDS.EMAIL, profile.email)}`,
-    `${label('Sign Commits')} ${profile.signingMethod ? `Using ${profile.signingMethod}` : 'No'}`,
+    `${label('Profile')}      ${profile.name}${wasSuffix(prev.name, profile.name)}`,
+    `${label('Host')}         ${profile.host}${wasSuffix(prev.host, profile.host)}`,
+    `${label('Name')}         ${field(PROFILE_FIELDS.USERNAME, profile.username)}${wasSuffix(prev.username, profile.username)}`,
+    `${label('Email')}        ${field(PROFILE_FIELDS.EMAIL, profile.email)}${wasSuffix(prev.email, profile.email)}`,
+    `${label('Sign Commits')} ${signingText(profile.signingMethod)}${wasSuffix(prev.signingMethod, profile.signingMethod, signingText)}`,
   ];
   if (profile.signingKey) {
     const display = buildSigningKey(profile.signingKey, signingStatus);
-    lines.push(`${label('Signing Key')}  ${display}`);
+    lines.push(`${label('Signing Key')}  ${display}${wasSuffix(prev.signingKey, profile.signingKey, specifiedOrNot, '\n')}`);
   }
   log.info(lines.join('\n'));
   if (mismatches && Object.keys(mismatches).length > 0) {

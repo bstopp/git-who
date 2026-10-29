@@ -3,10 +3,12 @@ import { strict as esmock } from 'esmock';
 import {
   gpgKeys,
   personalProfile,
+  sshKeys,
   validProfile,
   validProfileWithGpgKey,
   validProfileWithSshKey,
 } from '../fixtures.ts';
+import { Profile, SIGNING_METHOD } from '../../src/profile.ts';
 import { PROFILE_FIELDS, type ProfileMismatches, type SigningKeyStatus } from '../../src/utils/display.ts';
 
 describe('utils/display.ts', async () => {
@@ -148,5 +150,48 @@ describe('utils/display.ts', async () => {
     printProfile(validProfileWithSshKey);
     const output = infoOutput();
     assert.ok(output.match(new RegExp(`Signing Key.*${validProfileWithSshKey.signingKey}$`)));
+  });
+
+  describe('original', () => {
+    it('annotates changed fields with their original value', async () => {
+      const updated = new Profile('renamed', personalProfile);
+      printProfile(updated, { original: validProfile });
+      const output = infoOutput();
+      assert.ok(output.includes(`${updated.name} (was: ${validProfile.name})`));
+      assert.ok(output.includes(`${updated.host} (was: ${validProfile.host})`));
+      assert.ok(output.includes(`${updated.username} (was: ${validProfile.username})`));
+      assert.ok(output.includes(`${updated.email} (was: ${validProfile.email})`));
+    });
+
+    it('does not annotate unchanged fields', async () => {
+      printProfile(validProfileWithSshKey, { original: validProfileWithSshKey });
+      assert.ok(!infoOutput().includes('(was:'));
+    });
+
+    it('annotates added signing, and the signing key as not specified', async () => {
+      printProfile(validProfileWithSshKey, { original: validProfile });
+      const output = infoOutput();
+      assert.ok(output.includes(`Using ${SIGNING_METHOD.SSH} (was: No)`));
+      assert.ok(output.includes(`${validProfileWithSshKey.signingKey}\n(was: Not Specified)`));
+    });
+
+    it('annotates removed signing without a signing key line', async () => {
+      printProfile(validProfile, { original: validProfileWithGpgKey });
+      const output = infoOutput();
+      assert.ok(output.includes(`No (was: Using ${SIGNING_METHOD.GPG})`));
+      assert.ok(!output.includes('Signing Key'));
+    });
+
+    it('annotates a changed signing key with the original key', async () => {
+      const updated = new Profile(
+        validProfileWithSshKey.name,
+        validProfileWithSshKey,
+        { method: SIGNING_METHOD.SSH, key: sshKeys[0] },
+      );
+      printProfile(updated, { original: validProfileWithSshKey });
+      const output = infoOutput();
+      assert.ok(output.includes(`${sshKeys[0]}\n(was: ${validProfileWithSshKey.signingKey})`));
+      assert.ok(!output.includes('Sign Commits:[/Bold] Using ssh (was'));
+    });
   });
 });
