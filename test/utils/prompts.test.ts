@@ -27,6 +27,7 @@ type Mocks = Record<string, object>;
 describe('utils/prompts.ts', () => {
   let loadProfilesError: Error | undefined;
   let logInfo: string[] = [];
+  let logWarn: string[] = [];
 
   const profilesMock = {
     '../../src/utils/profiles.ts': {
@@ -46,6 +47,9 @@ describe('utils/prompts.ts', () => {
         info: () => {
           assert.fail('log info should not be called.');
         },
+        warn: () => {
+          assert.fail('log warn should not be called.');
+        },
       },
     },
   };
@@ -54,6 +58,15 @@ describe('utils/prompts.ts', () => {
     '../../src/utils/log.ts': {
       default: {
         info: (msg: string) => logInfo.push(msg),
+        warn: (msg: string) => logWarn.push(msg),
+      },
+    },
+  };
+
+  const chalkMock = {
+    chalk: {
+      default: {
+        bold: (text: string) => `[bold]${text}[/bold]`,
       },
     },
   };
@@ -177,8 +190,8 @@ describe('utils/prompts.ts', () => {
     'Git user.email:': pick('ignored'),
   });
 
-  const loadPromptForProfile = async (overrides: Mocks = {}) => {
-    const { promptForProfile } = await esmock<typeof import('../../src/utils/prompts.ts')>(
+  const loadPrompts = async (overrides: Mocks = {}) => {
+    return esmock<typeof import('../../src/utils/prompts.ts')>(
       '../../src/utils/prompts.ts',
       {
         ...logFail,
@@ -190,12 +203,22 @@ describe('utils/prompts.ts', () => {
         ...overrides, // same key wins, so it replaces the default
       },
     );
+  };
+
+  const loadPromptForProfile = async (overrides: Mocks = {}) => {
+    const { promptForProfile } = await loadPrompts(overrides);
     return promptForProfile;
+  };
+
+  const loadSelectProfile = async (overrides: Mocks = {}) => {
+    const { selectProfile } = await loadPrompts(overrides);
+    return selectProfile;
   };
 
   beforeEach(() => {
     loadProfilesError = undefined;
     logInfo = [];
+    logWarn = [];
   });
 
   describe('promptForProfile', () => {
@@ -564,6 +587,39 @@ describe('utils/prompts.ts', () => {
           }),
         );
       });
+    });
+  });
+
+  describe('selectProfile', () => {
+    const profileScreen = validProfiles.map((p) => new RegExp(p.name));
+
+    it('returns the named profile without prompting', async () => {
+      const selectProfile = await loadSelectProfile();
+      const profile = await selectProfile(validProfiles, validProfileWithGpgKey.name);
+      assert.equal(profile, validProfileWithGpgKey);
+    });
+
+    it('prompts for a profile when no name is given', async () => {
+      const selectProfile = await loadSelectProfile({
+        ...selectMock({
+          'Select profile:': selectChoice({ screen: profileScreen, keys: ['down'] }),
+        }),
+      });
+      const profile = await selectProfile(validProfiles);
+      assert.equal(profile, validProfiles[1]);
+    });
+
+    it('warns and prompts when the named profile is not found', async () => {
+      const selectProfile = await loadSelectProfile({
+        ...logMock,
+        ...chalkMock,
+        ...selectMock({
+          'Select profile:': selectChoice({ screen: profileScreen, keys: ['down', 'down'] }),
+        }),
+      });
+      const profile = await selectProfile(validProfiles, 'missing');
+      assert.equal(profile, validProfiles[2]);
+      assert.deepEqual(logWarn, ['Profile [bold]missing[/bold] not found, please select one:']);
     });
   });
 });

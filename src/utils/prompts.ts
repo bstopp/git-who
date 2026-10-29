@@ -1,3 +1,4 @@
+import chalk from 'chalk';
 import input from '@inquirer/input';
 import select from '@inquirer/select';
 
@@ -170,4 +171,18 @@ export async function promptForProfile(editing?: Profile): Promise<Profile> {
   const username = await usernameInput(uid?.name || editing?.username);
   const email = await emailInput(uid?.email || editing?.email);
   return new Profile(name, { host, username, email }, signingData);
+}
+
+export async function selectProfile(profiles: Profile[], name?: string): Promise<Profile> {
+  if (name) {
+    const found = profiles.find((p) => p.name === name);
+    if (found) {
+      return found;
+    }
+    log.warn(`Profile ${chalk.bold(name)} not found, please select one:`);
+  }
+  return select({
+    message: 'Select profile:',
+    choices: profiles.map((p) => ({ name: p.name, value: p })),
+  });
 }
