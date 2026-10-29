@@ -34,6 +34,9 @@ describe('utils/display.ts', async () => {
     ...chalkMock,
   });
 
+  const infoOutput = () => logInfoCalls.join('\n');
+  const warnOutput = () => logWarnCalls.join('\n');
+
   beforeEach(() => {
     logInfoCalls.length = 0;
     logWarnCalls.length = 0;
@@ -41,7 +44,7 @@ describe('utils/display.ts', async () => {
 
   it('displays default fields', async () => {
     printProfile(validProfile);
-    const output = logInfoCalls.join('\n');
+    const output = infoOutput();
     assert.ok(output.match(/\[Bold]Profile:\[\/Bold]\s+work/));
     assert.ok(output.match(/\[Bold]Host:\[\/Bold]\s+github-work/));
     assert.ok(output.match(/\[Bold]Name:\[\/Bold]\s+Bryan Work/));
@@ -53,7 +56,7 @@ describe('utils/display.ts', async () => {
   it('displays ssh signing key', async () => {
     const signingKeyStatus: SigningKeyStatus = { found: true };
     printProfile(validProfileWithSshKey, { signingKeyStatus });
-    const output = logInfoCalls.join('\n');
+    const output = infoOutput();
     assert.ok(output.match(/\[Bold]Sign Commits:\[\/Bold]\s+Using ssh/));
     assert.ok(output.match(new RegExp(`\\[Bold]Signing Key:\\[/Bold]\\s+${validProfileWithSshKey.signingKey}`)));
   });
@@ -61,7 +64,7 @@ describe('utils/display.ts', async () => {
   it('displays missing ssh signing key', async () => {
     const signingKeyStatus: SigningKeyStatus = { found: false };
     printProfile(validProfileWithSshKey, { signingKeyStatus });
-    const output = logInfoCalls.join('\n');
+    const output = infoOutput();
     assert.ok(output.match(/\[Bold]Sign Commits:\[\/Bold]\s+Using ssh/));
     assert.ok(output.match(new RegExp(`\\[Bold]Signing Key:\\[/Bold]\\s+\\[Yellow]${validProfileWithSshKey.signingKey} \\(not found\\)\\[/Yellow]`)));
   });
@@ -69,7 +72,7 @@ describe('utils/display.ts', async () => {
   it('displays gpg signing key with single uid on one line', async () => {
     const signingKeyStatus: SigningKeyStatus = { found: true, uids: gpgKeys[0].uids };
     printProfile(validProfileWithGpgKey, { signingKeyStatus });
-    const output = logInfoCalls.join('\n');
+    const output = infoOutput();
     assert.ok(output.match(/\[Bold]Sign Commits:\[\/Bold]\s+Using gpg/));
     assert.ok(output.match(/\[Bold]Signing Key:\[\/Bold]\s+FEDCBA0987654321, Bryan Work \(bryan@work.com\)/));
   });
@@ -77,7 +80,7 @@ describe('utils/display.ts', async () => {
   it('displays not found gpg signing key with single uid on one line', async () => {
     const signingKeyStatus: SigningKeyStatus = { found: false, uids: gpgKeys[0].uids };
     printProfile(validProfileWithGpgKey, { signingKeyStatus });
-    const output = logInfoCalls.join('\n');
+    const output = infoOutput();
     assert.ok(output.match(/\[Bold]Sign Commits:\[\/Bold]\s+Using gpg/));
     assert.ok(output.match(/\[Bold]Signing Key:\[\/Bold]\s+\[Yellow]FEDCBA0987654321, Bryan Work \(bryan@work.com\) \(not found\)\[\/Yellow]/));
   });
@@ -85,7 +88,7 @@ describe('utils/display.ts', async () => {
   it('displays gpg signing key with multiple uids on separate indented lines', async () => {
     const signingKeyStatus: SigningKeyStatus = { found: true, uids: gpgKeys[1].uids };
     printProfile(validProfileWithGpgKey, { signingKeyStatus });
-    const output = logInfoCalls.join('\n');
+    const output = infoOutput();
     assert.ok(output.match(/\[Bold]Sign Commits:\[\/Bold]\sUsing gpg/));
     assert.ok(output.match(/\[Bold]Signing Key:\[\/Bold]\s+FEDCBA0987654321\n/));
     assert.ok(output.match(/\s+Bryan Work \(bryan@work.com\)\n?/));
@@ -95,7 +98,7 @@ describe('utils/display.ts', async () => {
   it('displays not found gpg signing key with multiple uids on separate indented lines', async () => {
     const signingKeyStatus: SigningKeyStatus = { found: false, uids: gpgKeys[1].uids };
     printProfile(validProfileWithGpgKey, { signingKeyStatus });
-    const output = logInfoCalls.join('\n');
+    const output = infoOutput();
     assert.ok(output.match(/\[Bold]Sign Commits:\[\/Bold]\sUsing gpg/));
     assert.ok(output.match(/\[Bold]Signing Key:\[\/Bold]\s+\[Yellow]FEDCBA0987654321\n/));
     assert.ok(output.match(/\s+Bryan Work \(bryan@work.com\)/));
@@ -107,7 +110,7 @@ describe('utils/display.ts', async () => {
     const mismatches: ProfileMismatches = {};
     printProfile(validProfile, { mismatches });
     assert.equal(logWarnCalls.length, 0);
-    const output = logInfoCalls.join('\n');
+    const output = infoOutput();
     assert.ok(!output.match(/\*/));
   });
 
@@ -119,10 +122,10 @@ describe('utils/display.ts', async () => {
     };
     const opts = { signingKeyStatus, mismatches };
     printProfile(validProfile, opts);
-    const output = logInfoCalls.join('\n');
+    const output = infoOutput();
     assert.ok(output.match(/\[Bold]Name:\[\/Bold]\s+\[Yellow]Bryan Work \*\[\/Yellow]/));
     assert.ok(output.match(/\[Bold]Email:\[\/Bold]\s+\[Yellow]bryan@work.com \*\[\/Yellow]/));
-    const warnings = logWarnCalls.join('\n');
+    const warnings = warnOutput();
     assert.ok(warnings.match(/Git config does not match profile.*username=Bryan Personal.*email=bryan@personal.com/));
   });
 
@@ -134,16 +137,16 @@ describe('utils/display.ts', async () => {
     };
     const opts = { signingKeyStatus, mismatches };
     printProfile(validProfile, opts);
-    const output = logInfoCalls.join('\n');
+    const output = infoOutput();
     assert.ok(output.match(/\[Bold]Name:\[\/Bold]\s+\[Yellow]Bryan Work \*\[\/Yellow]/));
     assert.ok(output.match(/\[Bold]Email:\[\/Bold]\s+\[Yellow]bryan@work.com \*\[\/Yellow]/));
-    const warnings = logWarnCalls.join('\n');
+    const warnings = warnOutput();
     assert.ok(warnings.match(/Git config does not match profile.*username=.*email=/));
   });
 
   it('displays signing key with no status check performed', async () => {
     printProfile(validProfileWithSshKey);
-    const output = logInfoCalls.join('\n');
+    const output = infoOutput();
     assert.ok(output.match(new RegExp(`Signing Key.*${validProfileWithSshKey.signingKey}$`)));
   });
 });

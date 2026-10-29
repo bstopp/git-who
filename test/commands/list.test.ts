@@ -2,50 +2,99 @@ import assert from 'node:assert/strict';
 import { strict as esmock } from 'esmock';
 import type { SimpleGit } from 'simple-git';
 import { ambiguousProfiles } from '../fixtures.ts';
+import type { Profile } from '../../src/profile.ts';
 
-const fakeGit = {} as SimpleGit;
+type Mocks = Record<string, object>;
 
 describe('commands/list.ts', async () => {
-  it('passes through loadProfiles failures', async () => {
-    const { default: list } = await esmock<typeof import('../../src/commands/list.ts')>('../../src/commands/list.ts', {
-      '../../src/utils/profiles.ts': {
-        loadProfiles: async () => {
-          throw new Error('config is corrupt');
-        },
-        getActiveProfileName: async () => {
-          assert.fail('getActiveProfileName should not be called');
+  let profiles: Profile[] = ambiguousProfiles;
+  let activeName: string | undefined;
+  let logInfo: string = '';
+
+  const fakeGit = {} as SimpleGit;
+
+  const profilesMock = {
+    '../../src/utils/profiles.ts': {
+      loadProfiles: async () => profiles,
+      getActiveProfileName: async (git: SimpleGit) => {
+        assert.equal(git, fakeGit, 'getActiveProfileName should receive the simpleGit instance');
+        return activeName;
+      },
+    },
+  };
+
+  const profilesFail = {
+    '../../src/utils/profiles.ts': {
+      loadProfiles: async () => {
+        throw new Error('config is corrupt');
+      },
+      getActiveProfileName: async () => {
+        assert.fail('getActiveProfileName should not be called');
+      },
+    },
+  };
+
+  const logMock = {
+    '../../src/utils/log.ts': {
+      default: {
+        info: (msg: string) => logInfo = msg,
+      },
+    },
+  };
+
+  const simpleGitMock = {
+    'simple-git': {
+      simpleGit: () => fakeGit,
+    },
+  };
+
+  const chalkFail = {
+    chalk: {
+      default: {
+        bold: () => {
+          assert.fail('chalk.bold should not be called');
         },
       },
+    },
+  };
+
+  const chalkMock = {
+    chalk: {
+      default: {
+        bold: (text: string) => `[bold]${text}[/bold]`,
+      },
+    },
+  };
+
+  const loadList = async (overrides: Mocks = {}) => {
+    const { default: list } = await esmock<typeof import('../../src/commands/list.ts')>(
+      '../../src/commands/list.ts',
+      {
+        ...profilesMock,
+        ...logMock,
+        ...simpleGitMock,
+        ...chalkFail,
+        ...overrides, // same key wins, so it replaces the default
+      },
+    );
+    return list;
+  };
+
+  beforeEach(async () => {
+    profiles = ambiguousProfiles;
+    activeName = undefined;
+    logInfo = '';
+  });
+
+  it('passes through loadProfiles failures', async () => {
+    const list = await loadList({
+      ...profilesFail,
     });
     await assert.rejects(() => list(), { message: 'config is corrupt' });
   });
 
   it('prints all profiles', async () => {
-    let logInfo: string = '';
-    const { default: list } = await esmock<typeof import('../../src/commands/list.ts')>('../../src/commands/list.ts', {
-      '../../src/utils/profiles.ts': {
-        loadProfiles: async () => ambiguousProfiles,
-        getActiveProfileName: async (git: SimpleGit) => {
-          assert.equal(git, fakeGit, 'getActiveProfileName should receive the simpleGit instance');
-          return undefined;
-        },
-      },
-      '../../src/utils/log.ts': {
-        default: {
-          info: (msg: string) => logInfo = msg,
-        },
-      },
-      'simple-git': {
-        simpleGit: () => fakeGit,
-      },
-      chalk: {
-        default: {
-          bold: () => {
-            assert.fail('chalk.bold should not be called');
-          },
-        },
-      },
-    });
+    const list = await loadList();
     await assert.doesNotReject(() => list());
     const lines: string[] = logInfo.split('\n');
     assert.equal(lines.length, 4);
@@ -56,30 +105,9 @@ describe('commands/list.ts', async () => {
   });
 
   it('highlights active profile via gitwho.profile', async () => {
-    let logInfo: string = '';
-    const { default: list } = await esmock<typeof import('../../src/commands/list.ts')>('../../src/commands/list.ts', {
-      '../../src/utils/profiles.ts': {
-        loadProfiles: async () => ambiguousProfiles,
-        getActiveProfileName: async (git: SimpleGit) => {
-          assert.equal(git, fakeGit, 'getActiveProfileName should receive the simpleGit instance');
-          return ambiguousProfiles[1].name;
-        },
-      },
-      '../../src/utils/log.ts': {
-        default: {
-          info: (msg: string) => logInfo = msg,
-        },
-      },
-      'simple-git': {
-        simpleGit: () => fakeGit,
-      },
-      chalk: {
-        default: {
-          bold: (text: string) => {
-            return `[bold]${text}[/bold]`;
-          },
-        },
-      },
+    activeName = ambiguousProfiles[1].name;
+    const list = await loadList({
+      ...chalkMock,
     });
     await assert.doesNotReject(() => list());
     const lines: string[] = logInfo.split('\n');

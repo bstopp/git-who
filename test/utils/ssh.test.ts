@@ -2,13 +2,15 @@ import assert from 'node:assert/strict';
 import { strict as esmock } from 'esmock';
 import { sshKeys } from '../fixtures.ts';
 
+type Mocks = Record<string, object>;
+
 const invalidConfig = `
 Host *.example.com
 
 Host web?
 
 Host !foo.example.com # Not foo.
-    
+
 Host *
     ServerAliveInterval 60
 `;
@@ -34,240 +36,181 @@ ${validConfig}
 ${invalidConfig}
 `;
 
+// What `ssh -G` resolves each host in validConfig to, in the order they appear.
+const hostnames: Record<string, string> = {
+  'github-work': 'github-work.github.com',
+  work: 'work.github.com',
+  'github-personal': 'github-personal.github.com',
+  'github.com': 'github.com',
+};
+
+const hostEntries = (hosts: Record<string, string>) => {
+  return Object.entries(hosts).map(([host, hostname]) => ({ host, hostname }));
+};
+
 describe('utils/ssh.ts', () => {
+  // undefined means the call is not expected, Error means it throws
+  let configContents: string | Error | undefined;
+  let dirFiles: string[] | Error | undefined;
+  let sshResults: Record<string, string | Error>;
+  const logWarnCalls: string[] = [];
+
+  const homedirMock = { 'node:os': { homedir: () => '/home/user' } };
+
+  const fsPromisesMock = {
+    'node:fs/promises': {
+      readFile: async (path: string) => {
+        assert.equal(path, '/home/user/.ssh/config');
+        if (configContents === undefined) {
+          assert.fail('readFile should not have been called.');
+        }
+        if (configContents instanceof Error) {
+          throw configContents;
+        }
+        return configContents;
+      },
+      readdir: async (path: string) => {
+        assert.equal(path, '/home/user/.ssh');
+        if (dirFiles === undefined) {
+          assert.fail('readdir should not have been called.');
+        }
+        if (dirFiles instanceof Error) {
+          throw dirFiles;
+        }
+        return dirFiles;
+      },
+    },
+  };
+
+  const utilMock = {
+    'node:util': {
+      promisify: () => async (cmd: string, args: string[]) => {
+        assert.equal(cmd, 'ssh');
+        assert.equal(args.length, 2);
+        assert.equal(args[0], '-G');
+        const result = sshResults[args[1]];
+        if (result === undefined) {
+          assert.fail('Invalid args found.');
+        }
+        if (result instanceof Error) {
+          throw result;
+        }
+        return { stdout: `hostname ${result}\n`, stderr: '' };
+      },
+    },
+  };
+
+  const logFail = {
+    '../../src/utils/log.ts': {
+      default: {
+        warn: () => {
+          assert.fail('log warn should not be called.');
+        },
+      },
+    },
+  };
+
+  const logMock = {
+    '../../src/utils/log.ts': {
+      default: {
+        warn: (msg: string) => logWarnCalls.push(msg),
+      },
+    },
+  };
+
+  const loadSsh = async (overrides: Mocks = {}) => {
+    return esmock<typeof import('../../src/utils/ssh.ts')>(
+      '../../src/utils/ssh.ts',
+      {
+        ...homedirMock,
+        ...fsPromisesMock,
+        ...utilMock,
+        ...logFail,
+        ...overrides, // same key wins, so it replaces the default
+      },
+    );
+  };
+
+  beforeEach(() => {
+    configContents = undefined;
+    dirFiles = undefined;
+    sshResults = {};
+    logWarnCalls.length = 0;
+  });
+
   describe('listSshHosts', () => {
-    const readFileSuccess = (config: string) => {
-      return async (path: string) => {
-        assert.strictEqual(path, '/home/user/.ssh/config');
-        return config;
-      };
-    };
-
-    const readdirFail = () => {
-      return () => assert.fail('readdir should not have been called.');
-    };
-
-    const fsPromises = (config: string) => {
-      return {
-        'node:fs/promises': {
-          readFile: readFileSuccess(config),
-          readdir: readdirFail(),
-        },
-      };
-    };
-
-    const homedir = { 'node:os': { homedir: () => '/home/user' } };
-
     it('propagates a read error unmodified', async () => {
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
-        'node:fs/promises': {
-          readFile: async () => {
-            throw new Error('An Error');
-          },
-          readdir: readdirFail(),
-        },
-      });
+      configContents = new Error('An Error');
+      const { listSshHosts } = await loadSsh();
       await assert.rejects(listSshHosts(), { message: 'An Error' });
     });
 
     it('throws when config has no valid Host entries', async () => {
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
-        ...fsPromises(invalidConfig),
-        ...homedir,
-      });
+      configContents = invalidConfig;
+      const { listSshHosts } = await loadSsh();
       await assert.rejects(listSshHosts(), { message: 'No SSH host aliases found in ~/.ssh/config.' });
     });
 
     it('throws when no ssh -G succeeds', async () => {
-      const logWarnCalls: string[] = [];
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
-        ...fsPromises(validConfig),
-        ...homedir,
-        'node:util': {
-          promisify: () => async (cmd: string) => {
-            assert.equal(cmd, 'ssh');
-            throw new Error('ssh not found.');
-          },
-        },
-        '../../src/utils/log.ts': {
-          default: {
-            warn: (msg: string) => logWarnCalls.push(msg),
-          },
-        },
+      configContents = validConfig;
+      sshResults = Object.fromEntries(Object.keys(hostnames).map((host) => [host, new Error('ssh not found.')]));
+      const { listSshHosts } = await loadSsh({
+        ...logMock,
       });
       await assert.rejects(listSshHosts(), { message: 'No SSH host aliases found in ~/.ssh/config.' });
-      assert.equal(logWarnCalls.length, 4);
-      assert.ok(logWarnCalls.find((call) => call.includes("Unable to look up host 'github-work':")));
-      assert.ok(logWarnCalls.find((call) => call.includes("Unable to look up host 'work':")));
-      assert.ok(logWarnCalls.find((call) => call.includes("Unable to look up host 'github-personal':")));
-      assert.ok(logWarnCalls.find((call) => call.includes("Unable to look up host 'github.com':")));
+      assert.equal(logWarnCalls.length, Object.keys(hostnames).length);
+      for (const host of Object.keys(hostnames)) {
+        assert.ok(logWarnCalls.find((call) => call.includes(`Unable to look up host '${host}':`)));
+      }
     });
 
     it('builds a single entry result', async () => {
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
-        'node:fs/promises': {
-          readFile: async (path: string) => {
-            assert.strictEqual(path, '/home/user/.ssh/config');
-            return 'Host github-work # Work Profile\nUser git\nIdentityFile ~/.ssh/id_work';
-          },
-          readdir: readdirFail(),
-        },
-        ...homedir,
-        'node:util': {
-          promisify: () => async (cmd: string, args: string[]) => {
-            assert.equal(cmd, 'ssh');
-            assert.deepEqual(args, ['-G', 'github-work']);
-            return { stdout: 'hostname github.com\n', stderr: '' };
-          },
-        },
-      });
+      configContents = 'Host github-work # Work Profile\nUser git\nIdentityFile ~/.ssh/id_work';
+      sshResults = { 'github-work': 'github.com' };
+      const { listSshHosts } = await loadSsh();
       const hosts = await listSshHosts();
       assert.deepEqual(hosts, [{ host: 'github-work', hostname: 'github.com' }]);
     });
 
     it('builds map of hosts & hostnames', async () => {
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
-        ...fsPromises(fullConfig),
-        ...homedir,
-        'node:util': {
-          promisify: () => async (cmd: string, args: string[]) => {
-            assert.equal(cmd, 'ssh');
-            if (JSON.stringify(args) === JSON.stringify(['-G', 'github-work'])) {
-              return { stdout: 'hostname github-work.github.com\n', stderr: '' };
-            } else if (JSON.stringify(args) === JSON.stringify(['-G', 'work'])) {
-              return { stdout: 'hostname work.github.com\n', stderr: '' };
-            } else if (JSON.stringify(args) === JSON.stringify(['-G', 'github-personal'])) {
-              return { stdout: 'hostname github-personal.github.com\n', stderr: '' };
-            } else if (JSON.stringify(args) === JSON.stringify(['-G', 'github.com'])) {
-              return { stdout: 'hostname github.com\n', stderr: '' };
-            } else {
-              assert.fail('Invalid args found.');
-            }
-          },
-        },
-      });
+      configContents = fullConfig;
+      sshResults = { ...hostnames };
+      const { listSshHosts } = await loadSsh();
       const hosts = await listSshHosts();
-      assert.equal(hosts.length, 4);
-      assert.deepEqual(
-        hosts.find((h) => h.host === 'github-work'),
-        { host: 'github-work', hostname: 'github-work.github.com' },
-        'Github work not found.',
-      );
-      assert.deepEqual(
-        hosts.find((h) => h.host === 'work'),
-        { host: 'work', hostname: 'work.github.com' },
-        'Github.com work not found.',
-      );
-      assert.deepEqual(
-        hosts.find((h) => h.host === 'github-personal'),
-        { host: 'github-personal', hostname: 'github-personal.github.com' },
-        'Github personal not found.',
-      );
-      assert.deepEqual(
-        hosts.find((h) => h.host === 'github.com'),
-        { host: 'github.com', hostname: 'github.com' },
-        'Github.com not found.',
-      );
+      assert.deepEqual(hosts, hostEntries(hostnames));
     });
 
     it('logs error if one fails', async () => {
-      const logWarnCalls: string[] = [];
-      const { listSshHosts } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
-        ...fsPromises(validConfig),
-        ...homedir,
-        'node:util': {
-          promisify: () => async (cmd: string, args: string[]) => {
-            assert.equal(cmd, 'ssh');
-            if (JSON.stringify(args) === JSON.stringify(['-G', 'github-work'])) {
-              return { stdout: 'hostname github-work.github.com\n', stderr: '' };
-            } else if (JSON.stringify(args) === JSON.stringify(['-G', 'work'])) {
-              throw Error('ssh -G work failed.');
-            } else if (JSON.stringify(args) === JSON.stringify(['-G', 'github-personal'])) {
-              return { stdout: 'hostname github-personal.github.com\n', stderr: '' };
-            } else if (JSON.stringify(args) === JSON.stringify(['-G', 'github.com'])) {
-              return { stdout: 'hostname github.com\n', stderr: '' };
-            } else {
-              assert.fail('Invalid args found.');
-            }
-          },
-        },
-        '../../src/utils/log.ts': {
-          default: {
-            warn: (msg: string) => logWarnCalls.push(msg),
-          },
-        },
+      configContents = validConfig;
+      sshResults = { ...hostnames, work: new Error('ssh -G work failed.') };
+      const { listSshHosts } = await loadSsh({
+        ...logMock,
       });
 
       const hosts = await listSshHosts();
-      assert.equal(hosts.length, 3);
-      assert.deepEqual(
-        hosts.find((h) => h.host === 'github-work'),
-        { host: 'github-work', hostname: 'github-work.github.com' },
-        'Github work not found.',
-      );
-      assert.deepEqual(
-        hosts.find((h) => h.host === 'github-personal'),
-        { host: 'github-personal', hostname: 'github-personal.github.com' },
-        'Github personal not found.',
-      );
-      assert.deepEqual(
-        hosts.find((h) => h.host === 'github.com'),
-        { host: 'github.com', hostname: 'github.com' },
-        'Github.com not found.',
-      );
+      const { work: _, ...expected } = hostnames;
+      assert.deepEqual(hosts, hostEntries(expected));
       assert.ok(logWarnCalls.find((call) => call.includes("Unable to look up host 'work':")));
     });
   });
 
   describe('listSshKeys', () => {
-    const readFileFail = () => {
-      return () => assert.fail('readFile should not have been called.');
-    };
-
-    const readdirSuccess = (files: string[]) => {
-      return () => files;
-    };
-
-    const fsPromises = (files: string[]) => {
-      return {
-        'node:fs/promises': {
-          readFile: readFileFail(),
-          readdir: readdirSuccess(files),
-        },
-      };
-    };
-
-    const homedir = { 'node:os': { homedir: () => '/home/user' } };
-
     it('propagates a readdir error unmodified', async () => {
-      const { listSshKeys } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
-        'node:fs/promises': {
-          readFile: readFileFail(),
-          readdir: () => {
-            throw new Error('readdir failed');
-          },
-        },
-        ...homedir,
-      });
+      dirFiles = new Error('readdir failed');
+      const { listSshKeys } = await loadSsh();
       await assert.rejects(listSshKeys(), { message: 'readdir failed' });
     });
 
     it('returns an empty array when there are no keys', async () => {
-      const files = ['config', '.pub.foo'];
-      const { listSshKeys } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
-        ...fsPromises(files),
-        ...homedir,
-      });
+      dirFiles = ['config', '.pub.foo'];
+      const { listSshKeys } = await loadSsh();
       const actual = await listSshKeys();
       assert.deepEqual(actual, []);
     });
 
     it('returns found & filtered keys', async () => {
-      const files = ['id_work.pub', 'id_personal.pub', 'config', '.pub.foo'];
-      const { listSshKeys } = await esmock<typeof import('../../src/utils/ssh.ts')>('../../src/utils/ssh.ts', {
-        ...fsPromises(files),
-        ...homedir,
-      });
+      dirFiles = ['id_work.pub', 'id_personal.pub', 'config', '.pub.foo'];
+      const { listSshKeys } = await loadSsh();
       const actual = await listSshKeys();
       assert.deepEqual(actual, sshKeys);
     });
