@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { ExitPromptError } from '@inquirer/core';
 import pkg from '../package.json' with { type: 'json' };
 import show from './commands/show.ts';
 import list from './commands/list.ts';
@@ -8,6 +9,8 @@ import edit from './commands/edit.ts';
 import remove from './commands/remove.ts';
 import clone from './commands/clone.ts';
 import log from './utils/log.ts';
+
+const SIGINT_EXIT_CODE = 130; // 128 + SIGINT, the shell convention for an interrupted command
 
 export const program = new Command();
 
@@ -65,12 +68,17 @@ function describeError(err: unknown): string {
 }
 
 /**
- * Run the cli, printing any failure (with its cause chain) and setting a non-zero exit code.
+ * Run the cli, printing any failure (with its cause chain) and setting a non-zero exit code. A cancelled prompt
+ * (Ctrl+C) is not a failure, so it exits with the SIGINT code and prints nothing.
  */
 export async function run(argv: string[]): Promise<void> {
   try {
     await program.parseAsync(argv);
   } catch (err) {
+    if (err instanceof ExitPromptError) {
+      process.exitCode = SIGINT_EXIT_CODE;
+      return;
+    }
     log.error(describeError(err));
     process.exitCode = 1;
   }

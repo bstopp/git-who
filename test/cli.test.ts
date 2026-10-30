@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { strict as esmock } from 'esmock';
+import { ExitPromptError } from '@inquirer/core';
 
 type Call = unknown[];
 
@@ -102,6 +103,23 @@ describe('cli.ts', () => {
       assert.deepEqual(logErrorCalls, [
         `Failed to apply profile\nCaused by: ${middle.message}\nCaused by: ${root.message}`,
       ]);
+    });
+
+    it('exits quietly with the SIGINT exit code when a prompt is cancelled', async () => {
+      showError = new ExitPromptError();
+      const { run } = await loadCli();
+      await run(['node', 'git-who', 'show']);
+      assert.equal(process.exitCode, 130);
+      assert.deepEqual(logErrorCalls, []);
+    });
+
+    it('still logs an error that only looks like a cancelled prompt', async () => {
+      const lookalike = new Error('User force closed the prompt');
+      showError = lookalike;
+      const { run } = await loadCli();
+      await run(['node', 'git-who', 'show']);
+      assert.equal(process.exitCode, 1);
+      assert.deepEqual(logErrorCalls, [lookalike.message]);
     });
 
     it('logs a non-Error rejection as a string', async () => {
