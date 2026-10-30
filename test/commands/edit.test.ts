@@ -174,6 +174,29 @@ describe('commands/edit.ts', () => {
     assert.deepEqual(logWarnCalls, []);
   });
 
+  it('warns that repos using the old name need to be updated when the profile is renamed', async () => {
+    const renamed = new Profile(`${selected.name}-renamed`, selected);
+    edits = [renamed];
+    confirmSave = true;
+    const edit = await loadEdit();
+    await assert.doesNotReject(() => edit());
+    assert.deepEqual(updateProfileCall, { original: selected, update: renamed });
+    assert.deepEqual(logInfoCalls, [`Profile [bold]${renamed.name}[/bold] updated.`]);
+    assert.deepEqual(logWarnCalls, [
+      `Profile renamed from '${selected.name}' to '${renamed.name}'. Repos still using '${selected.name}' need \`git who use ${renamed.name}\` to pick up the new name.`,
+    ]);
+  });
+
+  it('does not warn about a rename when the changes are not saved', async () => {
+    edits = [new Profile(`${selected.name}-renamed`, selected)];
+    confirmSave = false;
+    const edit = await loadEdit({
+      ...updateProfileFail,
+    });
+    await assert.doesNotReject(() => edit());
+    assert.deepEqual(logWarnCalls, ['Profile not updated.']);
+  });
+
   it('does not save the changes if they are not confirmed', async () => {
     edits = [updated];
     confirmSave = false;
