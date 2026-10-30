@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { simpleGit } from 'simple-git';
-import { applyProfile, loadProfiles } from '../utils/profiles.ts';
+import { applyProfile, loadProfiles, verifySigningKey } from '../utils/profiles.ts';
 import { selectProfile } from '../utils/prompts.ts';
 import { parseSshUrl } from '../utils/git-url.ts';
 import log from '../utils/log.ts';
@@ -29,13 +29,15 @@ function getCloneInfo(host: string, repo: string) {
  *
  * @param repo - An ssh url (`git@host:org/repo.git` or `ssh://git@host/org/repo.git`) or an `org/repo` shorthand. The
  * host is always replaced with the profile's.
- * @throws {Error} If the repo format is not supported or the clone fails. A failure to apply the profile after a
- * successful clone is wrapped with its `cause`, as the repo is left cloned without the profile.
+ * @throws {Error} If the repo format is not supported, the profile's signing key is missing or cannot be looked up, or
+ * the clone fails. The signing key is checked before cloning, so its failure leaves nothing behind. A failure to apply
+ * the profile after a successful clone is wrapped with its `cause`, as the repo is left cloned without the profile.
  */
 export default async function clone(repo: string, name?: string): Promise<void> {
   const profiles = await loadProfiles();
   const profile = await selectProfile(profiles, name);
   const { url, dir } = getCloneInfo(profile.host, repo);
+  await verifySigningKey(profile);
   await simpleGit().clone(url, dir);
 
   try {

@@ -414,6 +414,79 @@ describe('utils/profiles.ts', () => {
     });
   });
 
+  const gpgKeysMock = (keys: { keyId: string; uids: string[] }[]) => ({
+    '../../src/utils/gpg.ts': { listGpgKeys: async () => keys },
+  });
+
+  const sshKeysMock = (keys: string[]) => ({
+    '../../src/utils/ssh.ts': { listSshKeys: async () => keys },
+  });
+
+  describe('verifySigningKey', () => {
+    it('resolves without looking up keys when the profile has no signing', async () => {
+      const { verifySigningKey } = await loadProfilesModule();
+      await assert.doesNotReject(() => verifySigningKey(validProfile));
+    });
+
+    it('resolves when the gpg key is found', async () => {
+      const { verifySigningKey } = await loadProfilesModule({
+        ...gpgKeysMock([{ keyId: validProfileWithGpgKey.signingKey!, uids: [] }]),
+      });
+      await assert.doesNotReject(() => verifySigningKey(validProfileWithGpgKey));
+    });
+
+    it('resolves when the ssh key is found', async () => {
+      const { verifySigningKey } = await loadProfilesModule({
+        ...sshKeysMock(sshKeys),
+      });
+      await assert.doesNotReject(() => verifySigningKey(validProfileWithSshKey));
+    });
+
+    it('throws a SigningKeyNotFoundError when the gpg key for profile.signingKey is not found', async () => {
+      const { verifySigningKey, SigningKeyNotFoundError } = await loadProfilesModule({
+        ...gpgKeysMock([]),
+      });
+      await assert.rejects(
+        () => verifySigningKey(validProfileWithGpgKey),
+        (err: NodeJS.ErrnoException) => {
+          assert.ok(err instanceof SigningKeyNotFoundError);
+          assert.equal(err.message, `GPG key '${validProfileWithGpgKey.signingKey}' not found for profile '${validProfileWithGpgKey.name}'.`);
+          return true;
+        },
+      );
+    });
+
+    it('throws a SigningKeyNotFoundError when the ssh key for profile.signingKey is not found', async () => {
+      const { verifySigningKey, SigningKeyNotFoundError } = await loadProfilesModule({
+        ...sshKeysMock([]),
+      });
+      await assert.rejects(
+        () => verifySigningKey(validProfileWithSshKey),
+        (err: NodeJS.ErrnoException) => {
+          assert.ok(err instanceof SigningKeyNotFoundError);
+          assert.equal(err.message, `SSH key '${validProfileWithSshKey.signingKey}' not found for profile '${validProfileWithSshKey.name}'.`);
+          return true;
+        },
+      );
+    });
+
+    it('passes through a gpg lookup failure unchanged', async () => {
+      const failure = new Error('gpg is required but was not found on PATH.');
+      const { verifySigningKey } = await loadProfilesModule({
+        '../../src/utils/gpg.ts': { listGpgKeys: async () => { throw failure; } },
+      });
+      await assert.rejects(() => verifySigningKey(validProfileWithGpgKey), failure);
+    });
+
+    it('passes through an ssh lookup failure unchanged', async () => {
+      const failure = new Error('EACCES: permission denied');
+      const { verifySigningKey } = await loadProfilesModule({
+        '../../src/utils/ssh.ts': { listSshKeys: async () => { throw failure; } },
+      });
+      await assert.rejects(() => verifySigningKey(validProfileWithSshKey), failure);
+    });
+  });
+
   describe('applyProfile', () => {
     const addConfigCalls: [string, string, boolean, string][] = [];
     const rawCalls: string[][] = [];
@@ -429,50 +502,9 @@ describe('utils/profiles.ts', () => {
       remote: () => assert.fail('remote should not be called.'),
     } as unknown as SimpleGit;
 
-    const untouchedGit = {
-      addConfig: () => assert.fail('addConfig should not be called'),
-      raw: () => assert.fail('raw should not be called'),
-    } as unknown as SimpleGit;
-
-    const gpgKeysMock = (keys: { keyId: string; uids: string[] }[]) => ({
-      '../../src/utils/gpg.ts': { listGpgKeys: async () => keys },
-    });
-
-    const sshKeysMock = (keys: string[]) => ({
-      '../../src/utils/ssh.ts': { listSshKeys: async () => keys },
-    });
-
     beforeEach(() => {
       addConfigCalls.length = 0;
       rawCalls.length = 0;
-    });
-
-    it('throws a SigningKeyNotFoundError when the gpg key for profile.signingKey is not found', async () => {
-      const { applyProfile: apply, SigningKeyNotFoundError } = await loadProfilesModule({
-        ...gpgKeysMock([]),
-      });
-      await assert.rejects(
-        () => apply(untouchedGit, validProfileWithGpgKey),
-        (err: NodeJS.ErrnoException) => {
-          assert.ok(err instanceof SigningKeyNotFoundError);
-          assert.equal(err.message, `GPG key '${validProfileWithGpgKey.signingKey}' not found for profile '${validProfileWithGpgKey.name}'.`);
-          return true;
-        },
-      );
-    });
-
-    it('throws a SigningKeyNotFoundError when the ssh key for profile.signingKey is not found, without touching git config', async () => {
-      const { applyProfile: apply, SigningKeyNotFoundError } = await loadProfilesModule({
-        ...sshKeysMock([]),
-      });
-      await assert.rejects(
-        () => apply(untouchedGit, validProfileWithSshKey),
-        (err: NodeJS.ErrnoException) => {
-          assert.ok(err instanceof SigningKeyNotFoundError);
-          assert.equal(err.message, `SSH key '${validProfileWithSshKey.signingKey}' not found for profile '${validProfileWithSshKey.name}'.`);
-          return true;
-        },
-      );
     });
 
     it('propagates the error when a git config update fails', async () => {
@@ -501,10 +533,7 @@ describe('utils/profiles.ts', () => {
     });
 
     it('sets user.signingKey and commit.gpgsign when profile has a signing method === gpg', async () => {
-      const { applyProfile: apply } = await loadProfilesModule({
-        ...gpgKeysMock([{ keyId: validProfileWithGpgKey.signingKey!, uids: [] }]),
-      });
-      await apply(mockGit, validProfileWithGpgKey);
+      await applyProfile(mockGit, validProfileWithGpgKey);
       assert.deepEqual(addConfigCalls, [
         ['gitwho.profile', validProfileWithGpgKey.name, false, 'local'],
         ['user.name', validProfileWithGpgKey.username, false, 'local'],
@@ -518,10 +547,7 @@ describe('utils/profiles.ts', () => {
     });
 
     it('sets user.signingKey, commit.gpgsign, gpg.format when profile has a signing method === ssh', async () => {
-      const { applyProfile: apply } = await loadProfilesModule({
-        ...sshKeysMock(sshKeys),
-      });
-      await apply(mockGit, validProfileWithSshKey);
+      await applyProfile(mockGit, validProfileWithSshKey);
       assert.deepEqual(addConfigCalls, [
         ['gitwho.profile', validProfileWithSshKey.name, false, 'local'],
         ['user.name', validProfileWithSshKey.username, false, 'local'],

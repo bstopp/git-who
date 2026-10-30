@@ -5,7 +5,7 @@ import { simpleGit, type SimpleGit } from 'simple-git';
 import type { Profile } from '../profile.ts';
 import log from '../utils/log.ts';
 import { selectProfile } from '../utils/prompts.ts';
-import { applyProfile, loadProfiles, SigningKeyNotFoundError } from '../utils/profiles.ts';
+import { applyProfile, loadProfiles, verifySigningKey } from '../utils/profiles.ts';
 import { parseSshUrl } from '../utils/git-url.ts';
 
 const HTTPS_URL_PATTERN = /^https?:\/\/[^/]+\/(.+)$/;
@@ -45,9 +45,10 @@ async function resolveOriginUrl(git: SimpleGit, profile: Profile): Promise<strin
 /**
  * Apply a profile to the current repo, either the one given by name or one picked from a prompt.
  *
- * @throws {Error} If the current directory is not a git repo, the origin remote url cannot be parsed, or applying the
- * profile fails. A failure other than a missing signing key is wrapped with its `cause`, since the git config may be
- * left partly updated; a missing signing key is thrown as is because nothing has been written by then.
+ * @throws {Error} If the current directory is not a git repo, the profile's signing key is missing or cannot be looked
+ * up, the origin remote url cannot be parsed, or applying the profile fails. The signing key is checked first and its
+ * failure is thrown as is, because nothing has been written by then. A failure to apply is wrapped with its `cause`,
+ * since the git config may be left partly updated.
  */
 export default async function use(name?: string): Promise<void> {
   const git = simpleGit();
@@ -56,13 +57,11 @@ export default async function use(name?: string): Promise<void> {
   }
   const profiles = await loadProfiles();
   const profile = await selectProfile(profiles, name);
+  await verifySigningKey(profile);
   const originUrl = await resolveOriginUrl(git, profile);
   try {
     await applyProfile(git, profile, originUrl);
   } catch (error) {
-    if (error instanceof SigningKeyNotFoundError) {
-      throw error;
-    }
     throw new Error(`Failed to apply profile '${profile.name}'. Git config may be partly updated; re-run to retry.`, { cause: error });
   }
   log.info(`Now using profile '${chalk.bold(profile.name)}'.`);

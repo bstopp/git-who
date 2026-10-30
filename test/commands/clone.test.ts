@@ -15,12 +15,16 @@ describe('commands/clone.ts', () => {
   let cloneError: Error | undefined;
   let cloneCalls: { url: string; dir: string }[] = [];
   let simpleGitCalls: (string | undefined)[] = [];
+  let verifySigningKeyError: Error | undefined;
+  let verifySigningKeyCall: Profile | undefined;
+  let events: string[] = [];
   let applyProfileError: Error | undefined;
   let applyProfileCall: { git: SimpleGit; profile: Profile; extraArgs: unknown[] } | undefined;
   const logInfoCalls: string[] = [];
 
   const cloningGit = {
     clone: async (url: string, dir: string) => {
+      events.push('clone');
       cloneCalls.push({ url, dir });
       if (cloneError) {
         throw cloneError;
@@ -47,6 +51,13 @@ describe('commands/clone.ts', () => {
           throw loadProfilesError;
         }
         return validProfiles;
+      },
+      verifySigningKey: async (profile: Profile) => {
+        events.push('verifySigningKey');
+        verifySigningKeyCall = profile;
+        if (verifySigningKeyError) {
+          throw verifySigningKeyError;
+        }
       },
       applyProfile: async (git: SimpleGit, profile: Profile, ...extraArgs: unknown[]) => {
         applyProfileCall = { git, profile, extraArgs };
@@ -116,6 +127,9 @@ describe('commands/clone.ts', () => {
     cloneError = undefined;
     cloneCalls = [];
     simpleGitCalls = [];
+    verifySigningKeyError = undefined;
+    verifySigningKeyCall = undefined;
+    events = [];
     applyProfileError = undefined;
     applyProfileCall = undefined;
     logInfoCalls.length = 0;
@@ -140,8 +154,20 @@ describe('commands/clone.ts', () => {
     const repo = 'https://github.com/org/repo';
     const clone = await loadClone();
     await assert.rejects(() => clone(repo, selected.name), { message: `Unsupported repo format: ${repo}` });
+    assert.equal(verifySigningKeyCall, undefined);
     assert.deepEqual(cloneCalls, []);
     assert.equal(applyProfileCall, undefined);
+  });
+
+  it('verifies the signing key before cloning, passing a failure through without cloning', async () => {
+    verifySigningKeyError = new SigningKeyNotFoundError('GPG key not found');
+    const clone = await loadClone();
+    await assert.rejects(() => clone('org/repo', selected.name), verifySigningKeyError);
+    assert.equal(verifySigningKeyCall, selected);
+    assert.deepEqual(events, ['verifySigningKey']);
+    assert.deepEqual(cloneCalls, []);
+    assert.equal(applyProfileCall, undefined);
+    assert.deepEqual(logInfoCalls, []);
   });
 
   it('passes through clone failures without applying the profile', async () => {
@@ -160,6 +186,8 @@ describe('commands/clone.ts', () => {
     assert.deepEqual(cloneCalls, [{ url, dir: 'repo' }]);
     assert.deepEqual(simpleGitCalls, [undefined, 'repo']);
     assert.deepEqual(applyProfileCall, { git: repoGit, profile: selected, extraArgs: [] });
+    assert.equal(verifySigningKeyCall, selected);
+    assert.deepEqual(events, ['verifySigningKey', 'clone']);
     assert.deepEqual(logInfoCalls, [doneMessage(url, 'repo')]);
   });
 
@@ -217,18 +245,6 @@ describe('commands/clone.ts', () => {
       return true;
     });
     assert.deepEqual(cloneCalls, [{ url: `git@${selected.host}:org/repo`, dir: 'repo' }]);
-    assert.deepEqual(logInfoCalls, []);
-  });
-
-  it('wraps a missing signing key the same way, since the clone already exists', async () => {
-    const cause = new SigningKeyNotFoundError('GPG key not found');
-    applyProfileError = cause;
-    const clone = await loadClone();
-    await assert.rejects(() => clone('org/repo', selected.name), (err: Error) => {
-      assert.equal(err.message, notAppliedMessage('repo'));
-      assert.equal(err.cause, cause);
-      return true;
-    });
     assert.deepEqual(logInfoCalls, []);
   });
 });

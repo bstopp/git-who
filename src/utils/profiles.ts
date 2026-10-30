@@ -205,20 +205,35 @@ export async function getActiveProfileName(git: SimpleGit) {
   return value ?? undefined;
 }
 
-export async function applyProfile(git: SimpleGit, profile: Profile, originUrl?: string) {
-  if (profile.signingKey !== undefined) {
-    if (profile.signingMethod === SIGNING_METHOD.GPG) {
-      const keys: GpgKey[] = await listGpgKeys(profile.signingKey);
-      if (keys.length === 0) {
-        throw new SigningKeyNotFoundError(`GPG key '${profile.signingKey}' not found for profile '${profile.name}'.`);
-      }
-    } else if (profile.signingMethod === SIGNING_METHOD.SSH) {
-      const sshKeys = await listSshKeys();
-      if (!sshKeys.includes(profile.signingKey)) {
-        throw new SigningKeyNotFoundError(`SSH key '${profile.signingKey}' not found for profile '${profile.name}'.`);
-      }
+/**
+ * Check that the profile's signing key, if it has one, exists on this machine. Nothing is written, so callers run this
+ * before applying a profile and can tell a failed lookup apart from a failed apply.
+ *
+ * @throws {SigningKeyNotFoundError} If the key is not found.
+ * @throws {Error} If the keys cannot be listed, such as when `gpg` is not installed.
+ */
+export async function verifySigningKey(profile: Profile) {
+  if (profile.signingKey === undefined) {
+    return;
+  }
+  if (profile.signingMethod === SIGNING_METHOD.GPG) {
+    const keys: GpgKey[] = await listGpgKeys(profile.signingKey);
+    if (keys.length === 0) {
+      throw new SigningKeyNotFoundError(`GPG key '${profile.signingKey}' not found for profile '${profile.name}'.`);
+    }
+  } else if (profile.signingMethod === SIGNING_METHOD.SSH) {
+    const sshKeys = await listSshKeys();
+    if (!sshKeys.includes(profile.signingKey)) {
+      throw new SigningKeyNotFoundError(`SSH key '${profile.signingKey}' not found for profile '${profile.name}'.`);
     }
   }
+}
+
+/**
+ * Write the profile to the repo's local git config, and set the origin remote url when one is given. The signing key
+ * is not checked here; call `verifySigningKey` first.
+ */
+export async function applyProfile(git: SimpleGit, profile: Profile, originUrl?: string) {
   await git.addConfig('gitwho.profile', profile.name, false, 'local');
   await git.addConfig('user.name', profile.username, false, 'local');
   await git.addConfig('user.email', profile.email, false, 'local');

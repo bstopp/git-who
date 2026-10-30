@@ -3,7 +3,6 @@ import { strict as esmock } from 'esmock';
 import type { SimpleGit } from 'simple-git';
 import { personalProfile, validProfile, validProfiles } from '../fixtures.ts';
 import type { Profile } from '../../src/profile.ts';
-import { SigningKeyNotFoundError } from '../../src/utils/profiles.ts';
 
 type Mocks = Record<string, object>;
 
@@ -15,7 +14,9 @@ describe('commands/use.ts', () => {
   let originUrl: string | null = null;
   let confirmAnswer: boolean | undefined;
   let confirmCalls: { message: string; default: boolean }[] = [];
+  let verifySigningKeyError: Error | undefined;
   let applyProfileError: Error | undefined;
+  let events: string[] = [];
   let applyProfileCall: { git: SimpleGit; profile: Profile; originUrl?: string } | undefined;
   const logInfoCalls: string[] = [];
   const logWarnCalls: string[] = [];
@@ -45,13 +46,19 @@ describe('commands/use.ts', () => {
         }
         return validProfiles;
       },
+      verifySigningKey: async (profile: Profile) => {
+        events.push(`verifySigningKey:${profile.name}`);
+        if (verifySigningKeyError) {
+          throw verifySigningKeyError;
+        }
+      },
       applyProfile: async (git: SimpleGit, profile: Profile, url?: string) => {
+        events.push('applyProfile');
         applyProfileCall = { git, profile, originUrl: url };
         if (applyProfileError) {
           throw applyProfileError;
         }
       },
-      SigningKeyNotFoundError,
     },
   };
 
@@ -76,6 +83,7 @@ describe('commands/use.ts', () => {
   const confirmMock = {
     '@inquirer/confirm': {
       default: async (config: { message: string; default: boolean }) => {
+        events.push('confirm');
         confirmCalls.push(config);
         if (confirmAnswer === undefined) {
           assert.fail('Unexpected confirm prompt: ' + config.message);
@@ -128,8 +136,10 @@ describe('commands/use.ts', () => {
     originUrl = null;
     confirmAnswer = undefined;
     confirmCalls = [];
+    verifySigningKeyError = undefined;
     applyProfileError = undefined;
     applyProfileCall = undefined;
+    events = [];
     logInfoCalls.length = 0;
     logWarnCalls.length = 0;
   });
@@ -207,10 +217,22 @@ describe('commands/use.ts', () => {
     assert.equal(applyProfileCall, undefined);
   });
 
-  it('rethrows a SigningKeyNotFoundError without warning', async () => {
-    applyProfileError = new SigningKeyNotFoundError('GPG key not found');
+  it('verifies the signing key before asking about the origin or applying the profile', async () => {
+    originUrl = `git@${personalProfile.host}:org/repo.git`;
+    confirmAnswer = true;
     const use = await loadUse();
-    await assert.rejects(() => use(), applyProfileError);
+    await assert.doesNotReject(() => use());
+    assert.deepEqual(events, [`verifySigningKey:${selected.name}`, 'confirm', 'applyProfile']);
+  });
+
+  it('passes through a signing key failure as is, before anything is asked or applied', async () => {
+    originUrl = `git@${personalProfile.host}:org/repo.git`;
+    verifySigningKeyError = new Error('gpg is required but was not found on PATH.');
+    const use = await loadUse();
+    await assert.rejects(() => use(), verifySigningKeyError);
+    assert.deepEqual(events, [`verifySigningKey:${selected.name}`]);
+    assert.deepEqual(confirmCalls, []);
+    assert.equal(applyProfileCall, undefined);
     assert.deepEqual(logWarnCalls, []);
     assert.deepEqual(logInfoCalls, []);
   });
