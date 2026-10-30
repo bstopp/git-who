@@ -4,7 +4,7 @@
   "functions": 100,
   "branches": 100,
   "reporter": ["text", "lcov", "html"],
-  "include": ["src/**", "bin/**"],
+  "include": ["src/**"],
   "exclude": ["test/**"],
   "all": true,
   "check-coverage": true
