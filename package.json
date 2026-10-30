@@ -16,14 +16,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@inquirer/core": "^11.2.1",
+    "@inquirer/core": "^12.0.6",
     "@inquirer/testing": "^3.3.10",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^24.13.3",
+    "@types/node": "^24.19.2",
     "c8": "^12.0.0",
-    "esmock": "^2.7.6",
-    "mocha": "^11.7.6",
+    "esmock": "^3.0.0",
+    "mocha": "^12.0.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0"
   },
@@ -32,6 +32,6 @@
     "@inquirer/input": "^5.1.2",
     "@inquirer/select": "^5.2.1",
     "chalk": "^6.0.0",
-    "simple-git": "^3.36.0"
+    "simple-git": "^4.0.2"
   }
 }
