@@ -44,6 +44,8 @@ const hostnames: Record<string, string> = {
   'github.com': 'github.com',
 };
 
+const enoent = () => Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
+
 const hostEntries = (hosts: Record<string, string>) => {
   return Object.entries(hosts).map(([host, hostname]) => ({ host, hostname }));
 };
@@ -145,6 +147,17 @@ describe('utils/ssh.ts', () => {
       await assert.rejects(listSshHosts(), { message: 'An Error' });
     });
 
+    it('throws the no host aliases error, keeping the cause, when the config file does not exist', async () => {
+      const missing = enoent();
+      configContents = missing;
+      const { listSshHosts } = await loadSsh();
+      await assert.rejects(listSshHosts(), (err: Error) => {
+        assert.equal(err.message, 'No SSH host aliases found in ~/.ssh/config.');
+        assert.equal(err.cause, missing);
+        return true;
+      });
+    });
+
     it('throws when config has no valid Host entries', async () => {
       configContents = invalidConfig;
       const { listSshHosts } = await loadSsh();
@@ -199,6 +212,12 @@ describe('utils/ssh.ts', () => {
       dirFiles = new Error('readdir failed');
       const { listSshKeys } = await loadSsh();
       await assert.rejects(listSshKeys(), { message: 'readdir failed' });
+    });
+
+    it('returns an empty array when the ssh directory does not exist', async () => {
+      dirFiles = enoent();
+      const { listSshKeys } = await loadSsh();
+      assert.deepEqual(await listSshKeys(), []);
     });
 
     it('returns an empty array when there are no keys', async () => {

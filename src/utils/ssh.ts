@@ -9,6 +9,8 @@ const execFileAsync = promisify(execFile);
 
 type HostEntry = { host: string; hostname: string };
 
+const isMissing = (err: unknown) => (err as NodeJS.ErrnoException).code === 'ENOENT';
+
 function parseSshSearch(host: string, stdout: string): { host: string; hostname: string } {
   const hostname = stdout.split('\n')
     .find((line) => line.toLowerCase().startsWith('hostname'))!
@@ -38,9 +40,19 @@ async function buildHostsResult(hosts: string[]): Promise<HostEntry[]> {
 
 /**
  * List SSH host aliases configured in ~/.ssh/config, resolved via `ssh -G`.
+ *
+ * @throws {Error} If no host aliases can be found, including when ~/.ssh/config does not exist (kept as the `cause`).
  */
 export async function listSshHosts(): Promise<HostEntry[]> {
-  const configs = await readConfig();
+  let configs;
+  try {
+    configs = await readConfig();
+  } catch (err) {
+    if (isMissing(err)) {
+      throw new Error('No SSH host aliases found in ~/.ssh/config.', { cause: err });
+    }
+    throw err;
+  }
   const hosts: string[] = [];
   for (const line of configs.split('\n')) {
     const match = line.trim().match(/^Host\s+([^#]+).*$/i);
@@ -60,10 +72,18 @@ export async function listSshHosts(): Promise<HostEntry[]> {
 }
 
 /**
- * List SSH public key files (*.pub) found in ~/.ssh.
+ * List SSH public key files (*.pub) found in ~/.ssh. A missing ~/.ssh has no keys, so it gives an empty list.
  */
 export async function listSshKeys() {
   const path = join(homedir(), '.ssh');
-  const files = await readdir(path);
+  let files;
+  try {
+    files = await readdir(path);
+  } catch (err) {
+    if (isMissing(err)) {
+      return [];
+    }
+    throw err;
+  }
   return files.filter((f) => f.endsWith('.pub')).map((f) => join(path, f)).sort();
 }
