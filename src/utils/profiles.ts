@@ -113,21 +113,21 @@ async function saveProfiles(profiles: Profile[]) {
   }
 }
 
+const unsetConfig = (git: SimpleGit, key: string) => git.raw(['config', '--local', '--unset', key]);
+
 async function applySigningConfig(git: SimpleGit, profile: Profile) {
-  if (profile.signingKey !== undefined) {
-    if (profile.signingMethod === SIGNING_METHOD.SSH) {
-      await git.addConfig('user.signingKey', profile.signingKey, false, 'local');
-      await git.addConfig('commit.gpgsign', 'true', false, 'local');
-      await git.addConfig('gpg.format', 'ssh', false, 'local');
-    } else if (profile.signingMethod === SIGNING_METHOD.GPG) {
-      await git.addConfig('user.signingKey', profile.signingKey, false, 'local');
-      await git.addConfig('commit.gpgsign', 'true', false, 'local');
-      await git.raw(['config', '--local', '--unset', 'gpg.format']);
-    }
+  if (profile.signingKey === undefined) {
+    await unsetConfig(git, 'user.signingKey');
+    await unsetConfig(git, 'commit.gpgsign');
+    await unsetConfig(git, 'gpg.format');
+    return;
+  }
+  await git.addConfig('user.signingKey', profile.signingKey, false, 'local');
+  await git.addConfig('commit.gpgsign', 'true', false, 'local');
+  if (profile.signingMethod === SIGNING_METHOD.SSH) {
+    await git.addConfig('gpg.format', 'ssh', false, 'local');
   } else {
-    await git.raw(['config', '--local', '--unset', 'user.signingKey']);
-    await git.raw(['config', '--local', '--unset', 'commit.gpgsign']);
-    await git.raw(['config', '--local', '--unset', 'gpg.format']);
+    await unsetConfig(git, 'gpg.format');
   }
 }
 
