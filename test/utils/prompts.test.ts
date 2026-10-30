@@ -6,6 +6,7 @@ import {
   gpgKeys,
   sshHosts,
   sshKeys,
+  validProfile,
   validProfiles,
   validProfileWithGpgKey,
   validProfileWithSshKey,
@@ -586,6 +587,39 @@ describe('utils/prompts.ts', () => {
             key: '/home/user/.ssh/id_work.pub',
           }),
         );
+      });
+
+      it('defaults to not signing when provided a profile without signing', async () => {
+        const promptForProfile = await loadPromptForProfile({
+          ...inputMock({
+            'Profile name:': answerInput('profile-name', validProfile.name),
+            'Git user.name:': answerInput('Git Username', validProfile.username),
+            'Git user.email:': answerInput('email@git.com', validProfile.email),
+          }),
+          ...selectMock({
+            'SSH Host:': selectChoice({ default: validProfile.host, screen: hostScreen, keys: ['down'] }),
+            'Sign Commits?': selectChoice({ default: 'no' }),
+          }),
+        });
+        assert.deepEqual(await promptForProfile(validProfile), minimumProfile);
+      });
+
+      it('defaults to ssh signing when creating a new profile', async () => {
+        const promptForProfile = await loadPromptForProfile({
+          ...sshKeysMock(sshKeys),
+          ...inputMock({
+            'Profile name:': answerInput('profile-name'),
+            'Git user.name:': answerInput('Git Username'),
+            'Git user.email:': answerInput('email@git.com'),
+          }),
+          ...selectMock({
+            'SSH Host:': selectChoice({ screen: hostScreen }),
+            'Sign Commits?': selectChoice({ default: SIGNING_METHOD.SSH }),
+            'Select an SSH key:': selectChoice({ screen: sshKeyScreen }),
+          }),
+        });
+        const profile = await promptForProfile();
+        assert.equal(profile.signingMethod, SIGNING_METHOD.SSH);
       });
     });
   });

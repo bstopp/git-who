@@ -149,7 +149,8 @@ async function emailInput(current?: string) {
 }
 
 async function promptSignCommits(editing: Profile | undefined) {
-  const method = await signInput(editing?.signingMethod);
+  // A profile being edited keeps its current choice, which is 'no' when it has no signing; a new one defaults to ssh.
+  const method = await signInput(editing ? editing.signingMethod ?? 'no' : undefined);
   let signingData: SigningData | undefined;
   let uid: Uid | undefined;
   if (method === SIGNING_METHOD.GPG) {
