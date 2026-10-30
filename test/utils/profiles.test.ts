@@ -95,12 +95,20 @@ describe('utils/profiles.ts', () => {
 
     it('throws if the config file exists but cannot be read', async () => {
       await writeConfig(validProfiles);
-      await withConfigMode(0o000, () => assert.rejects(() => loadProfiles(), { message: /^Config file could not be read: / }));
+      await withConfigMode(0o000, () => assert.rejects(() => loadProfiles(), (err: Error) => {
+        assert.match(err.message, /^Config file could not be read: /);
+        assert.equal((err.cause as NodeJS.ErrnoException).code, 'EACCES');
+        return true;
+      }));
     });
 
-    it('throws if the config file is corrupt', async () => {
+    it('throws if the config file is corrupt, keeping the parse error as the cause', async () => {
       await writeFile(CONFIG_PATH, 'not valid json');
-      await assert.rejects(() => loadProfiles(), { message: /^Config file could not be parsed: / });
+      await assert.rejects(() => loadProfiles(), (err: Error) => {
+        assert.match(err.message, /^Config file could not be parsed: /);
+        assert.ok(err.cause instanceof SyntaxError);
+        return true;
+      });
     });
 
     it('throws if the config file contains a primitive', async () => {
@@ -241,7 +249,11 @@ describe('utils/profiles.ts', () => {
     it('throws if the config file cannot be written', async () => {
       await writeConfig(validProfiles);
       await withConfigMode(0o444, async () => {
-        await assert.rejects(() => addProfile(personalProfile), { message: /^Config file could not be written: / });
+        await assert.rejects(() => addProfile(personalProfile), (err: Error) => {
+          assert.match(err.message, /^Config file could not be written: /);
+          assert.equal((err.cause as NodeJS.ErrnoException).code, 'EACCES');
+          return true;
+        });
         const profiles = await loadProfiles();
         // validate cache wasn't updated
         assert.deepEqual(clearUndefined(profiles), clearUndefined(validProfiles));

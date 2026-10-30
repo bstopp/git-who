@@ -23,8 +23,8 @@ export class SigningKeyNotFoundError extends Error {
   }
 }
 
-function configParseError() {
-  return new Error(`Config file could not be parsed: ${CONFIG_PATH}`);
+function configParseError(cause?: unknown) {
+  return new Error(`Config file could not be parsed: ${CONFIG_PATH}`, { cause });
 }
 
 // Two access() checks rather than a single readFile+errno inspection — keeps error
@@ -38,16 +38,16 @@ async function readAndParseConfig(): Promise<unknown[]> {
   }
   try {
     await access(CONFIG_PATH, constants.R_OK);
-  } catch {
-    throw new Error(`Config file could not be read: ${CONFIG_PATH}`);
+  } catch (err) {
+    throw new Error(`Config file could not be read: ${CONFIG_PATH}`, { cause: err });
   }
   let profiles;
   try {
     profiles = JSON.parse(
       await readFile(CONFIG_PATH, 'utf8'),
     );
-  } catch {
-    throw configParseError();
+  } catch (err) {
+    throw configParseError(err);
   }
   if (profiles && !Array.isArray(profiles)) {
     throw configParseError();
@@ -108,8 +108,8 @@ async function saveProfiles(profiles: Profile[]) {
   try {
     await writeFile(CONFIG_PATH, JSON.stringify(profiles, null, 2), 'utf8');
     cache = Promise.resolve(profiles);
-  } catch {
-    throw new Error(`Config file could not be written: ${CONFIG_PATH}`);
+  } catch (err) {
+    throw new Error(`Config file could not be written: ${CONFIG_PATH}`, { cause: err });
   }
 }
 
