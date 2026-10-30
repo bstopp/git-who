@@ -55,6 +55,55 @@ async function readAndParseConfig(): Promise<unknown[]> {
   return profiles;
 }
 
+function invalidProfileError(index: number, reason?: string, cause?: unknown) {
+  const detail = reason ? `: ${reason}` : '';
+  return new Error(`Config file has an invalid profile at position ${index + 1}${detail} (${CONFIG_PATH})`, { cause });
+}
+
+type ProfileEntry = { name: string; host: string; username: string; email: string; signingMethod?: string; signingKey?: string };
+
+/**
+ * Check the shape of an entry of the config file, which is unvalidated input.
+ *
+ * @throws {Error} If the entry is not an object or a field is missing or not a string.
+ */
+function checkEntryShape(raw: unknown, index: number): ProfileEntry {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw invalidProfileError(index, 'expected an object.');
+  }
+  const obj = raw as Record<string, unknown>;
+  for (const field of ['name', 'host', 'username', 'email']) {
+    if (typeof obj[field] !== 'string') {
+      throw invalidProfileError(index, `'${field}' must be a string.`);
+    }
+  }
+  if (obj.signingMethod !== undefined && typeof obj.signingMethod !== 'string') {
+    throw invalidProfileError(index, "'signingMethod' must be a string.");
+  }
+  if (obj.signingMethod !== undefined && typeof obj.signingKey !== 'string') {
+    throw invalidProfileError(index, "'signingKey' must be a string when 'signingMethod' is set.");
+  }
+  return obj as ProfileEntry;
+}
+
+/**
+ * Build a profile from an entry of the config file.
+ *
+ * @throws {Error} If the entry has the wrong shape, or its values fail the profile's validation. The latter is thrown
+ * with the validation error as its `cause`.
+ */
+function parseProfile(raw: unknown, index: number): Profile {
+  const entry = checkEntryShape(raw, index);
+  const signing = entry.signingMethod !== undefined
+    ? { method: entry.signingMethod as SigningData['method'], key: entry.signingKey! }
+    : undefined;
+  try {
+    return new Profile(entry.name, entry, signing);
+  } catch (err) {
+    throw invalidProfileError(index, undefined, err);
+  }
+}
+
 async function saveProfiles(profiles: Profile[]) {
   try {
     await writeFile(CONFIG_PATH, JSON.stringify(profiles, null, 2), 'utf8');
@@ -86,13 +135,7 @@ export async function loadProfiles(): Promise<Profile[]> {
   if (!cache) {
     cache = (async () => {
       const parsed = await readAndParseConfig() || [];
-      const profiles = parsed.map((raw) => {
-        const obj = raw as Profile;
-        const signing: SigningData | undefined = obj.signingMethod !== undefined
-          ? { method: obj.signingMethod, key: obj.signingKey! }
-          : undefined;
-        return new Profile(obj.name, obj, signing);
-      });
+      const profiles = parsed.map(parseProfile);
       if (profiles.length === 0) {
         throw new NoProfilesError();
       }

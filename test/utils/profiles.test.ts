@@ -130,6 +130,61 @@ describe('utils/profiles.ts', () => {
       await assert.rejects(() => loadProfiles());
     });
 
+    describe('with a malformed profile entry', () => {
+      const invalidAt = (position: number, reason: string) => {
+        return `Config file has an invalid profile at position ${position}: ${reason} (${CONFIG_PATH})`;
+      };
+
+      for (const [label, entry] of [['null', null], ['a string', 'work'], ['a number', 1], ['an array', []]] as const) {
+        it(`throws naming the config file if an entry is ${label}`, async () => {
+          await writeConfig([validProfile, entry]);
+          await assert.rejects(() => loadProfiles(), { message: invalidAt(2, 'expected an object.') });
+        });
+      }
+
+      for (const field of ['name', 'host', 'username', 'email'] as const) {
+        it(`throws naming the config file if '${field}' is missing`, async () => {
+          await writeConfig([{ ...validProfile, [field]: undefined }]);
+          await assert.rejects(() => loadProfiles(), { message: invalidAt(1, `'${field}' must be a string.`) });
+        });
+      }
+
+      it('throws naming the config file if a required field is not a string', async () => {
+        await writeConfig([{ ...validProfile, host: 7 }]);
+        await assert.rejects(() => loadProfiles(), { message: invalidAt(1, "'host' must be a string.") });
+      });
+
+      it('throws naming the config file if signingMethod is not a string', async () => {
+        await writeConfig([{ ...validProfileWithSshKey, signingMethod: 7 }]);
+        await assert.rejects(() => loadProfiles(), { message: invalidAt(1, "'signingMethod' must be a string.") });
+      });
+
+      it('throws naming the config file if signingMethod is set without a signingKey', async () => {
+        await writeConfig([{ ...validProfileWithSshKey, signingKey: undefined }]);
+        await assert.rejects(() => loadProfiles(), {
+          message: invalidAt(1, "'signingKey' must be a string when 'signingMethod' is set."),
+        });
+      });
+
+      it('wraps a validation failure with its cause, naming the config file and position', async () => {
+        const bad = { ...personalProfile, host: 'github personal!' };
+        await writeConfig([validProfile, bad]);
+        const expected = (() => {
+          try {
+            new Profile(bad.name, bad);
+          } catch (err) {
+            return err as Error;
+          }
+          return assert.fail('the bad profile should not validate');
+        })();
+        await assert.rejects(() => loadProfiles(), (err: Error) => {
+          assert.equal(err.message, `Config file has an invalid profile at position 2 (${CONFIG_PATH})`);
+          assert.deepEqual(err.cause, expected);
+          return true;
+        });
+      });
+    });
+
     it('returns all profiles when file is valid', async () => {
       await writeConfig(validProfiles);
       const profiles = await loadProfiles();
