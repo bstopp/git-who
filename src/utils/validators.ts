@@ -21,7 +21,7 @@ export function validateHost(value: string) {
 }
 
 /**
- * @throws {Error} If value is empty or contains characters other than letters, numbers, spaces, dot, or dash.
+ * @throws {Error} If value is empty or only whitespace.
  */
 export function validateUsername(value: string) {
   if (!value.trim()) {
