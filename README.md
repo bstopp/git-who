@@ -21,10 +21,12 @@ Now using profile 'work'.
 
 ## Installation
 
-Install `git-who` so the `git-who` executable is on your `PATH`. Git runs any `git-<name>` executable on your `PATH` as
-`git <name>`, so the tool is then available as `git who`.
+```
+npm install --global @bstopp/git-who
+```
 
-<!-- TODO: add the actual install command once the package has a build/publish step. -->
+This puts a `git-who` executable on your `PATH`. Git runs any `git-<name>` executable on your `PATH` as `git <name>`,
+so the tool is then available as `git who`.
 
 ## Quick start
 

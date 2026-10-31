@@ -1,11 +1,22 @@
 {
-  "name": "git-who",
+  "name": "@bstopp/git-who",
   "version": "0.1.0",
   "type": "module",
   "description": "Manage git profiles for per-project SSH account configuration.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bstopp/git-who.git"
+  },
+  "homepage": "https://github.com/bstopp/git-who#readme",
+  "bugs": {
+    "url": "https://github.com/bstopp/git-who/issues"
+  },
   "bin": {
     "git-who": "./dist/bin/git-who.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist"
@@ -30,6 +41,7 @@
     "c8": "^12.0.0",
     "esmock": "^3.0.0",
     "mocha": "^12.0.3",
+    "semantic-release": "^25.0.9",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0"
   },

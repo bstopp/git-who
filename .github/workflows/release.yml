@@ -1,0 +1,43 @@
+name: Release
+
+# Runs only when CI has finished successfully for a push to main, and releases the commit that CI tested.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Releases run one at a time and are never cancelled half way.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    # The environment is restricted to main, and is the one the npm trusted publisher is set up for.
+    environment: release
+    permissions:
+      contents: write # to push the tag and publish a GitHub release
+      issues: write # to comment on released issues
+      pull-requests: write # to comment on released pull requests
+      id-token: write # to publish to npm with trusted publishing and provenance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }} # the commit CI passed on, not whatever main is now
+          fetch-depth: 0 # semantic-release reads the whole history and the tags
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # npm publish runs the build through prepack.
+      - run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
