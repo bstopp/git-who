@@ -1,6 +1,6 @@
 {
   "name": "@bstopp/git-who",
-  "version": "0.1.0",
+  "version": "0.0.0-development",
   "type": "module",
   "description": "Manage git profiles for per-project SSH account configuration.",
   "license": "Apache-2.0",
