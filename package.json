@@ -3,10 +3,16 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Manage git profiles for per-project SSH account configuration.",
+  "license": "Apache-2.0",
   "bin": {
     "git-who": "./dist/bin/git-who.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
     "lint": "eslint",
     "test": "c8 mocha 'test/**/*.test.ts'",
     "test:e2e": "mocha --node-option experimental-test-module-mocks 'test/e2e/**/*.e2e.ts'",

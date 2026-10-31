@@ -3,6 +3,7 @@ import js from '@eslint/js';
 import stylistic from '@stylistic/eslint-plugin';
 
 export default [
+  { ignores: ['dist/', 'coverage/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   stylistic.configs.customize({
