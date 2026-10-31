@@ -13,7 +13,7 @@
     "url": "https://github.com/bstopp/git-who/issues"
   },
   "bin": {
-    "git-who": "./dist/bin/git-who.js"
+    "git-who": "dist/bin/git-who.js"
   },
   "publishConfig": {
     "access": "public"
