@@ -156,23 +156,23 @@ async function resolveProfile(name: string | undefined, profiles: Profile[]): Pr
 }
 
 /**
- * Print a profile, either the one given by name or the one resolved from the current repo. A profile resolved from the
- * repo is also checked against its git config, and any signing key is looked up to confirm it exists.
- *
- * @throws {Error} If no name is given outside a git repo, the named profile does not exist, or no profile can be
- * resolved from the repo. Errors from the ssh and gpg key lookups are not caught.
+ * The result as a plain object for `--json`. The warnings that are printed as text become fields, so nothing is lost
+ * from stdout. A mismatched field git has no value for is `null`, which JSON would otherwise drop from the object.
  */
-export default async function show(name?: string): Promise<void> {
-  const git = simpleGit();
-  if (!name && !(await git.checkIsRepo())) {
-    throw new Error('You must provide a profile name, or invoke the show command from a git repo.');
-  }
+function toJson(resolved: ResolvedInfo, signingKeyStatus?: SigningKeyStatus) {
+  const { profile, derived, mismatches } = resolved;
+  return {
+    profile,
+    derived,
+    signingKeyStatus,
+    mismatches: mismatches && Object.fromEntries(Object.entries(mismatches).map(([field, value]) => [field, value ?? null])),
+  };
+}
 
-  const profiles = await loadProfiles();
-  const resolved = await resolveProfile(name, profiles);
-
-  const signingKeyStatus = await buildStatus(resolved);
-
+/**
+ * The extras for `printProfile`, or `undefined` when there are none, so a plain profile is printed without them.
+ */
+function displayOptions(resolved: ResolvedInfo, signingKeyStatus?: SigningKeyStatus) {
   let opts: {
     signingKeyStatus?: SigningKeyStatus;
     mismatches?: ProfileMismatches;
@@ -185,7 +185,34 @@ export default async function show(name?: string): Promise<void> {
     opts ||= {};
     opts.signingKeyStatus = signingKeyStatus;
   }
-  printProfile(resolved.profile, opts);
+  return opts;
+}
+
+/**
+ * Print a profile, either the one given by name or the one resolved from the current repo. A profile resolved from the
+ * repo is also checked against its git config, and any signing key is looked up to confirm it exists. With `json` the
+ * result is printed as JSON instead.
+ *
+ * @throws {Error} If no name is given outside a git repo, the named profile does not exist, or no profile can be
+ * resolved from the repo. Errors from the ssh and gpg key lookups are not caught.
+ */
+export default async function show(name?: string, options: { json?: boolean } = {}): Promise<void> {
+  const git = simpleGit();
+  if (!name && !(await git.checkIsRepo())) {
+    throw new Error('You must provide a profile name, or invoke the show command from a git repo.');
+  }
+
+  const profiles = await loadProfiles();
+  const resolved = await resolveProfile(name, profiles);
+
+  const signingKeyStatus = await buildStatus(resolved);
+
+  if (options.json) {
+    log.json(toJson(resolved, signingKeyStatus));
+    return;
+  }
+
+  printProfile(resolved.profile, displayOptions(resolved, signingKeyStatus));
   if (resolved.derived) {
     log.warn(`Profile derived from git config — not explicitly set via gitwho.profile`);
   }

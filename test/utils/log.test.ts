@@ -74,4 +74,15 @@ describe('utils/log.ts', () => {
     assert.equal(stderr.length, 0);
     assert.equal(stdout[0], '\nhello world\n');
   });
+
+  it('logs json as indented JSON on stdout, without padding or colors', async () => {
+    const log = await loadLog();
+    const value = { name: 'work', tags: ['a', 'b'] };
+    log.json(value);
+    assert.deepEqual(stdout, [JSON.stringify(value, null, 2)]);
+    assert.deepEqual(JSON.parse(stdout[0]), value);
+    assert.deepEqual(redCalls, []);
+    assert.deepEqual(yellowCalls, []);
+    assert.equal(stderr.length, 0);
+  });
 });

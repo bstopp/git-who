@@ -29,6 +29,7 @@ describe('commands/show.ts', async () => {
   let profiles: Profile[] = multiProfiles;
   let gitwhoProfile: string | null = null;
   const logWarnCalls: string[] = [];
+  const logJsonCalls: unknown[] = [];
 
   const fakeGit = {
     checkIsRepo: async () => true,
@@ -123,6 +124,18 @@ describe('commands/show.ts', async () => {
     },
   };
 
+  // JSON output goes to stdout and carries the warnings as fields, so nothing is warned about on stderr.
+  const logJsonMock = {
+    '../../src/utils/log.ts': {
+      default: {
+        json: (value: unknown) => logJsonCalls.push(value),
+        warn: () => {
+          assert.fail('log warn should not be called.');
+        },
+      },
+    },
+  };
+
   const loadShow = async (overrides: Mocks = {}) => {
     const { default: show } = await esmock<typeof import('../../src/commands/show.ts')>(
       '../../src/commands/show.ts',
@@ -149,6 +162,7 @@ describe('commands/show.ts', async () => {
     profiles = multiProfiles;
     gitwhoProfile = null;
     logWarnCalls.length = 0;
+    logJsonCalls.length = 0;
   });
 
   it('throws when named profile is not found', async () => {
@@ -503,5 +517,116 @@ describe('commands/show.ts', async () => {
     assert.ok(listGpgKeysCalled, 'listGpgKeys was not called');
     assert.ok(printProfileParam, 'printProfile was not called');
     assert.deepEqual(printProfileParam, { profile: validProfileWithGpgKey, opts: { signingKeyStatus } });
+  });
+
+  describe('with json', () => {
+    const showJson = async (name?: string, overrides: Mocks = {}) => {
+      const show = await loadShow({ ...printProfileFail, ...logJsonMock, ...overrides });
+      return show(name, { json: true });
+    };
+
+    it('prints a named profile, which has nothing to compare against', async () => {
+      await assert.doesNotReject(() => showJson(validProfile.name));
+      assert.deepEqual(logJsonCalls, [{
+        profile: validProfile,
+        derived: false,
+        signingKeyStatus: undefined,
+        mismatches: undefined,
+      }]);
+    });
+
+    it('prints no mismatches when the repo config matches the profile', async () => {
+      gitwhoProfile = validProfile.name;
+      userName = validProfile.username;
+      userEmail = validProfile.email;
+      await assert.doesNotReject(() => showJson());
+      assert.deepEqual(logJsonCalls, [{
+        profile: validProfile,
+        derived: false,
+        signingKeyStatus: undefined,
+        mismatches: {},
+      }]);
+    });
+
+    it('marks the fields git has nothing for as null, so they are not dropped', async () => {
+      gitwhoProfile = validProfile.name;
+      await assert.doesNotReject(() => showJson());
+      assert.deepEqual(logJsonCalls, [{
+        profile: validProfile,
+        derived: false,
+        signingKeyStatus: undefined,
+        mismatches: { username: null, email: null },
+      }]);
+    });
+
+    it('prints the values git has where they differ from the profile', async () => {
+      gitwhoProfile = validProfile.name;
+      userName = personalProfile.username;
+      userEmail = personalProfile.email;
+      await assert.doesNotReject(() => showJson());
+      assert.deepEqual(logJsonCalls, [{
+        profile: validProfile,
+        derived: false,
+        signingKeyStatus: undefined,
+        mismatches: { username: personalProfile.username, email: personalProfile.email },
+      }]);
+    });
+
+    it('flags a profile derived from the git config, without warning', async () => {
+      userName = validProfile.username;
+      userEmail = validProfile.email;
+      await assert.doesNotReject(() => showJson());
+      assert.deepEqual(logJsonCalls, [{
+        profile: validProfile,
+        derived: true,
+        signingKeyStatus: undefined,
+        mismatches: {},
+      }]);
+    });
+
+    it('includes the status of an ssh signing key', async () => {
+      profiles = [validProfileWithSshKey];
+      await assert.doesNotReject(() => showJson(validProfileWithSshKey.name, {
+        '../../src/utils/ssh.ts': { listSshKeys: async () => sshKeys },
+      }));
+      assert.deepEqual(logJsonCalls, [{
+        profile: validProfileWithSshKey,
+        derived: false,
+        signingKeyStatus: { found: true },
+        mismatches: undefined,
+      }]);
+    });
+
+    it('includes the status and identities of a gpg signing key', async () => {
+      profiles = [validProfileWithGpgKey];
+      await assert.doesNotReject(() => showJson(validProfileWithGpgKey.name, {
+        '../../src/utils/gpg.ts': { listGpgKeys: async () => gpgKeys },
+      }));
+      assert.deepEqual(logJsonCalls, [{
+        profile: validProfileWithGpgKey,
+        derived: false,
+        signingKeyStatus: { found: true, uids: gpgKeys[0].uids },
+        mismatches: undefined,
+      }]);
+    });
+
+    it('reports a signing key that is not found', async () => {
+      profiles = [validProfileWithSshKey];
+      await assert.doesNotReject(() => showJson(validProfileWithSshKey.name, {
+        '../../src/utils/ssh.ts': { listSshKeys: async () => [] },
+      }));
+      assert.deepEqual(logJsonCalls, [{
+        profile: validProfileWithSshKey,
+        derived: false,
+        signingKeyStatus: { found: false },
+        mismatches: undefined,
+      }]);
+    });
+
+    it('prints nothing when the profile cannot be found', async () => {
+      profiles = [];
+      await assert.rejects(() => showJson('not-found'), { message: 'Profile not-found not found.' });
+      assert.deepEqual(logJsonCalls, []);
+    });
   });
 });

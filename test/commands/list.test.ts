@@ -10,6 +10,7 @@ describe('commands/list.ts', async () => {
   let profiles: Profile[] = ambiguousProfiles;
   let activeName: string | undefined;
   let logInfo: string = '';
+  let logJson: unknown;
 
   const fakeGit = {} as SimpleGit;
 
@@ -38,6 +39,7 @@ describe('commands/list.ts', async () => {
     '../../src/utils/log.ts': {
       default: {
         info: (msg: string) => logInfo = msg,
+        json: (value: unknown) => logJson = value,
       },
     },
   };
@@ -84,6 +86,7 @@ describe('commands/list.ts', async () => {
     profiles = ambiguousProfiles;
     activeName = undefined;
     logInfo = '';
+    logJson = undefined;
   });
 
   it('passes through loadProfiles failures', async () => {
@@ -116,5 +119,29 @@ describe('commands/list.ts', async () => {
     assert(lines.some((line) => line === '  - work (github-work)'));
     assert(lines.some((line) => line === '[bold]  - work-gpg-signed (github-work)[/bold]'));
     assert(lines.some((line) => line === '  - work-ssh-signed (github-work)'));
+  });
+
+  describe('with json', () => {
+    it('prints every profile with its fields and flags the active one', async () => {
+      activeName = ambiguousProfiles[1].name;
+      const list = await loadList();
+      await assert.doesNotReject(() => list({ json: true }));
+      assert.deepEqual(logJson, ambiguousProfiles.map((p) => ({ ...p, active: p.name === activeName })));
+      assert.equal(logInfo, '', 'the text listing should not be printed');
+    });
+
+    it('flags no profile as active when none is set', async () => {
+      const list = await loadList();
+      await assert.doesNotReject(() => list({ json: true }));
+      assert.deepEqual(logJson, ambiguousProfiles.map((p) => ({ ...p, active: false })));
+    });
+
+    it('passes through loadProfiles failures without printing anything', async () => {
+      const list = await loadList({
+        ...profilesFail,
+      });
+      await assert.rejects(() => list({ json: true }), { message: 'config is corrupt' });
+      assert.equal(logJson, undefined);
+    });
   });
 });

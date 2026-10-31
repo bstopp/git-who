@@ -21,6 +21,13 @@ const log = {
   info(msg: string) {
     console.log(`\n${msg}\n`);
   },
+
+  /**
+   * Writes a value to stdout as indented JSON, with no blank lines or colors so the output can be parsed as is.
+   */
+  json(value: unknown) {
+    console.log(JSON.stringify(value, null, 2));
+  },
 };
 
 export default log;

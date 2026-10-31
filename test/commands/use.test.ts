@@ -20,6 +20,7 @@ describe('commands/use.ts', () => {
   let applyProfileCall: { git: SimpleGit; profile: Profile; originUrl?: string } | undefined;
   const logInfoCalls: string[] = [];
   const logWarnCalls: string[] = [];
+  const logJsonCalls: unknown[] = [];
 
   const highlight = (text: string) => `[hl]${text}[/hl]`;
 
@@ -76,6 +77,7 @@ describe('commands/use.ts', () => {
       default: {
         info: (msg: string) => logInfoCalls.push(msg),
         warn: (msg: string) => logWarnCalls.push(msg),
+        json: (value: unknown) => logJsonCalls.push(value),
       },
     },
   };
@@ -142,6 +144,7 @@ describe('commands/use.ts', () => {
     events = [];
     logInfoCalls.length = 0;
     logWarnCalls.length = 0;
+    logJsonCalls.length = 0;
   });
 
   it('throws when the current directory is not a git repository', async () => {
@@ -248,5 +251,94 @@ describe('commands/use.ts', () => {
     });
     assert.deepEqual(logWarnCalls, []);
     assert.deepEqual(logInfoCalls, []);
+  });
+
+  describe('with --update-origin', () => {
+    it('updates a mismatched origin without asking', async () => {
+      originUrl = `git@${personalProfile.host}:org/repo.git`;
+      const desiredUrl = `git@${selected.host}:org/repo.git`;
+      const use = await loadUse();
+      await assert.doesNotReject(() => use(selected.name, { updateOrigin: true }));
+      assert.deepEqual(confirmCalls, []);
+      assert.deepEqual(applyProfileCall, { git: fakeGit, profile: selected, originUrl: desiredUrl });
+      assert.deepEqual(logInfoCalls, [`Now using profile '[bold]${selected.name}[/bold]'.`]);
+    });
+
+    it('leaves an origin that already matches alone', async () => {
+      originUrl = `git@${selected.host}:org/repo.git`;
+      const use = await loadUse();
+      await assert.doesNotReject(() => use(selected.name, { updateOrigin: true }));
+      assert.deepEqual(applyProfileCall, { git: fakeGit, profile: selected, originUrl: undefined });
+    });
+  });
+
+  describe('with --json', () => {
+    const useJson = async (name: string | undefined, updateOrigin?: boolean) => {
+      const use = await loadUse();
+      return use(name, { json: true, updateOrigin });
+    };
+
+    it('requires a profile name instead of prompting', async () => {
+      await assert.rejects(() => useJson(undefined), { message: 'A profile name is required with --json.' });
+      assert.equal(selectProfileCall, undefined);
+      assert.equal(applyProfileCall, undefined);
+    });
+
+    it('fails on an unknown profile name instead of prompting', async () => {
+      await assert.rejects(() => useJson('no-such-profile'), { message: 'Profile no-such-profile not found.' });
+      assert.equal(selectProfileCall, undefined);
+      assert.equal(applyProfileCall, undefined);
+    });
+
+    it('still requires a git repository', async () => {
+      isRepo = false;
+      await assert.rejects(() => useJson(selected.name), { message: 'The current directory must have a git repository to use a profile.' });
+      assert.deepEqual(logJsonCalls, []);
+    });
+
+    it('applies the named profile and prints it as JSON, not as text', async () => {
+      await assert.doesNotReject(() => useJson(selected.name));
+      assert.equal(selectProfileCall, undefined, 'the profile picker should not be used');
+      assert.deepEqual(applyProfileCall, { git: fakeGit, profile: selected, originUrl: undefined });
+      assert.deepEqual(logJsonCalls, [{ profile: selected, originUpdated: false, origin: undefined }]);
+      assert.deepEqual(logInfoCalls, []);
+    });
+
+    it('does not report an origin that already matches', async () => {
+      originUrl = `git@${selected.host}:org/repo.git`;
+      await assert.doesNotReject(() => useJson(selected.name, true));
+      assert.deepEqual(logJsonCalls, [{ profile: selected, originUpdated: false, origin: undefined }]);
+    });
+
+    it('leaves a mismatched origin alone and reports it, without asking', async () => {
+      originUrl = `git@${personalProfile.host}:org/repo.git`;
+      const expected = `git@${selected.host}:org/repo.git`;
+      await assert.doesNotReject(() => useJson(selected.name));
+      assert.deepEqual(confirmCalls, []);
+      assert.deepEqual(applyProfileCall, { git: fakeGit, profile: selected, originUrl: undefined });
+      assert.deepEqual(logJsonCalls, [{ profile: selected, originUpdated: false, origin: { current: originUrl, expected } }]);
+    });
+
+    it('updates a mismatched origin when --update-origin is set', async () => {
+      originUrl = `git@${personalProfile.host}:org/repo.git`;
+      const expected = `git@${selected.host}:org/repo.git`;
+      await assert.doesNotReject(() => useJson(selected.name, true));
+      assert.deepEqual(confirmCalls, []);
+      assert.deepEqual(applyProfileCall, { git: fakeGit, profile: selected, originUrl: expected });
+      assert.deepEqual(logJsonCalls, [{ profile: selected, originUpdated: true, origin: { current: originUrl, expected } }]);
+    });
+
+    it('still verifies the signing key first and prints nothing when it fails', async () => {
+      verifySigningKeyError = new Error('gpg is required but was not found on PATH.');
+      await assert.rejects(() => useJson(selected.name), verifySigningKeyError);
+      assert.deepEqual(events, [`verifySigningKey:${selected.name}`]);
+      assert.deepEqual(logJsonCalls, []);
+    });
+
+    it('prints nothing when applying fails', async () => {
+      applyProfileError = new Error('addConfig failed');
+      await assert.rejects(() => useJson(selected.name), { message: `Failed to apply profile '${selected.name}'. Git config may be partly updated; re-run to retry.` });
+      assert.deepEqual(logJsonCalls, []);
+    });
   });
 });

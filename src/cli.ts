@@ -23,16 +23,20 @@ program
 program
   .command('show [name]')
   .description('Show the current git profile for this repo')
+  .option('--json', 'Print the result as JSON')
   .action(show);
 
 program
   .command('list')
   .description('List all available profiles')
+  .option('--json', 'Print the result as JSON')
   .action(list);
 
 program
   .command('use [name]')
   .description('Set the profile for this repo.')
+  .option('--json', 'Print the result as JSON, without prompting (a profile name is required)')
+  .option('--update-origin', 'Update the origin remote to match the profile, without asking')
   .action(use);
 
 program
@@ -55,16 +59,20 @@ program
   .description('Clone a remote repo using a specific profile.')
   .action(clone);
 /**
- * Join an error's message with those of its `cause` chain, one per line, so wrapped failures show the real reason.
+ * The message of an error followed by those of its `cause` chain, so wrapped failures show the real reason.
  */
-function describeError(err: unknown): string {
-  const lines: string[] = [];
+function errorMessages(err: unknown): string[] {
+  const messages: string[] = [];
   let current = err;
   while (current instanceof Error) {
-    lines.push(lines.length === 0 ? current.message : `Caused by: ${current.message}`);
+    messages.push(current.message);
     current = current.cause;
   }
-  return lines.length > 0 ? lines.join('\n') : String(err);
+  return messages.length > 0 ? messages : [String(err)];
+}
+
+function describeError(err: unknown): string {
+  return errorMessages(err).map((message, i) => i === 0 ? message : `Caused by: ${message}`).join('\n');
 }
 
 /**
@@ -79,7 +87,12 @@ export async function run(argv: string[]): Promise<void> {
       process.exitCode = SIGINT_EXIT_CODE;
       return;
     }
-    log.error(describeError(err));
+    if (argv.includes('--json')) {
+      const [error, ...causes] = errorMessages(err);
+      log.json({ error, causes });
+    } else {
+      log.error(describeError(err));
+    }
     process.exitCode = 1;
   }
 }

@@ -9,6 +9,7 @@ describe('cli.ts', () => {
   let calls: Record<string, Call[]>;
   let showError: unknown;
   let logErrorCalls: string[];
+  let logJsonCalls: unknown[];
 
   const loadCli = async () => {
     const commandMocks = Object.fromEntries(commands.map((name) => [
@@ -22,10 +23,20 @@ describe('cli.ts', () => {
         },
       },
     ]));
-    return esmock<typeof import('../src/cli.ts')>('../src/cli.ts', {
+    const cli = await esmock<typeof import('../src/cli.ts')>('../src/cli.ts', {
       ...commandMocks,
-      '../src/utils/log.ts': { default: { error: (msg: string) => logErrorCalls.push(msg) } },
+      '../src/utils/log.ts': {
+        default: {
+          error: (msg: string) => logErrorCalls.push(msg),
+          json: (value: unknown) => logJsonCalls.push(value),
+        },
+      },
     });
+    // Commander exits the process on a usage error, which would end the whole test run. Throwing instead fails one test.
+    for (const command of [cli.program, ...cli.program.commands]) {
+      command.exitOverride().configureOutput({ writeErr: () => {} });
+    }
+    return cli;
   };
 
   const parse = async (argv: string[]) => {
@@ -37,6 +48,7 @@ describe('cli.ts', () => {
     calls = Object.fromEntries(commands.map((name) => [name, []]));
     showError = undefined;
     logErrorCalls = [];
+    logJsonCalls = [];
   });
 
   describe('routing', () => {
@@ -71,6 +83,40 @@ describe('cli.ts', () => {
       await parse(['clone', 'org/repo', 'work']);
       assert.deepEqual(calls.clone[0].slice(0, 2), ['org/repo', 'work']);
     });
+  });
+
+  describe('options', () => {
+    it('passes --json to show', async () => {
+      await parse(['show', 'work', '--json']);
+      assert.deepEqual(calls.show[0].slice(0, 2), ['work', { json: true }]);
+    });
+
+    it('passes --json to list', async () => {
+      await parse(['list', '--json']);
+      assert.deepEqual(calls.list[0][0], { json: true });
+    });
+
+    it('passes --json and --update-origin to use', async () => {
+      await parse(['use', 'work', '--json', '--update-origin']);
+      assert.deepEqual(calls.use[0].slice(0, 2), ['work', { json: true, updateOrigin: true }]);
+    });
+
+    it('passes --update-origin to use on its own', async () => {
+      await parse(['use', 'work', '--update-origin']);
+      assert.deepEqual(calls.use[0].slice(0, 2), ['work', { updateOrigin: true }]);
+    });
+
+    // The commands that prompt for input have no agent-friendly mode, so they must not accept --json.
+    for (const name of ['add', 'edit', 'remove'] as const) {
+      it(`rejects --json on ${name}`, async () => {
+        const { program } = await loadCli();
+        await assert.rejects(
+          () => program.parseAsync(['node', 'git-who', name, '--json']),
+          { code: 'commander.unknownOption' },
+        );
+        assert.equal(calls[name].length, 0);
+      });
+    }
   });
 
   describe('run', () => {
@@ -128,6 +174,42 @@ describe('cli.ts', () => {
       await run(['node', 'git-who', 'show']);
       assert.equal(process.exitCode, 1);
       assert.deepEqual(logErrorCalls, ['boom']);
+    });
+
+    describe('with --json', () => {
+      it('prints the error as JSON instead of text, and still fails', async () => {
+        const error = new Error('config is corrupt');
+        showError = error;
+        const { run } = await loadCli();
+        await run(['node', 'git-who', 'show', '--json']);
+        assert.equal(process.exitCode, 1);
+        assert.deepEqual(logJsonCalls, [{ error: error.message, causes: [] }]);
+        assert.deepEqual(logErrorCalls, []);
+      });
+
+      it('lists the cause chain outermost first', async () => {
+        const root = new Error('ENOENT: gpg');
+        const middle = new Error('Failed to list keys', { cause: root });
+        const outer = new Error('Failed to apply profile', { cause: middle });
+        showError = outer;
+        const { run } = await loadCli();
+        await run(['node', 'git-who', 'show', '--json']);
+        assert.deepEqual(logJsonCalls, [{ error: outer.message, causes: [middle.message, root.message] }]);
+      });
+
+      it('prints a non-Error rejection as a string', async () => {
+        showError = 'boom';
+        const { run } = await loadCli();
+        await run(['node', 'git-who', 'show', '--json']);
+        assert.deepEqual(logJsonCalls, [{ error: showError, causes: [] }]);
+      });
+
+      it('leaves a successful run silent', async () => {
+        const { run } = await loadCli();
+        await run(['node', 'git-who', 'show', '--json']);
+        assert.equal(process.exitCode, undefined);
+        assert.deepEqual(logJsonCalls, []);
+      });
     });
   });
 });
