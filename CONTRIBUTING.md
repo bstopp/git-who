@@ -45,9 +45,26 @@ Run these before opening a pull request. All of them must pass.
 
 ## Commits and pull requests
 
-- Keep commits small and focused. Write the message as a full sentence ending in a period, in the imperative: "Warn when
-  a renamed profile leaves repos using the old name."
+Pull requests are squash merged, so the pull request title becomes the commit on `main`. Releases are made automatically
+from those titles, so the title must follow the [Conventional Commits](https://www.conventionalcommits.org) format:
+
+```
+type(optional scope): description
+```
+
+| Type | Effect on release |
+| --- | --- |
+| `feat` | New minor version |
+| `fix`, `perf` | New patch version |
+| `docs`, `chore`, `ci`, `test`, `refactor`, `build`, `style`, `revert` | No release |
+
+Add `!` after the type, for example `feat!: rename the config file`, for a change that breaks existing users. That makes
+a new major version. A check on every pull request fails if the title does not match.
+
+- Keep pull requests small and focused, with a short imperative description: `fix: warn when a renamed profile leaves
+  repos using the old name`.
 - Describe what changed and why in the pull request, and note anything you could not test.
+- The messages of the individual commits inside a pull request don't affect releases, only the title does.
 
 ## License
 
