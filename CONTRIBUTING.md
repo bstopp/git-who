@@ -1,0 +1,55 @@
+# Contributing
+
+Thanks for your interest in `git-who`. Bug reports, ideas and pull requests are welcome.
+
+## Getting set up
+
+You need Node.js 24 or later, git and ssh (see [Requirements](README.md#requirements)).
+
+```
+npm install
+```
+
+There is no build step. Node runs the TypeScript sources directly, using its built-in type stripping.
+
+## Checks
+
+Run these before opening a pull request. All of them must pass.
+
+| Command | What it does |
+| --- | --- |
+| `npm test` | Unit tests. A 100% coverage threshold applies to `src/`. |
+| `npm run test:e2e` | End-to-end test of the profile lifecycle. |
+| `npm run lint` | ESLint, including the style rules and a complexity cap of 10. |
+| `npm run typecheck` | TypeScript, with no emit. |
+
+## Writing tests
+
+- **Add or change the test first.** New behavior and bug fixes come with a test.
+- **Tests may not start a process.** `test/hooks.ts` replaces every `child_process` spawner with one that throws. If a
+  test trips it, mock the dependency that spawns (git, ssh, gpg) rather than working around the guard.
+- **Mock with `esmock`** in the unit tests. Mocking is strict, so mocking an export that does not exist fails.
+- **Derive expected values from the fixtures** in `test/fixtures.ts` or from the mock's own variable. Don't retype them
+  as literals in the assertion.
+- **The end-to-end test runs in its own process** (`npm run test:e2e`), because it uses Node's `mock.module`, which can
+  only replace modules that nothing else has loaded. Don't import anything from `src/` statically in it.
+
+## Code style
+
+- Match the surrounding code: naming, comment density and idiom.
+- ESLint is the style reference. `npm run lint` tells you what it wants.
+- Don't add a custom `Error` subclass unless a caller needs `instanceof` to decide what to do. A plain `Error` with a
+  clear message is the default.
+- When one error wraps another, pass the original as `cause`. The CLI prints the whole `Caused by:` chain.
+- Comments explain why, and JSDoc documents what a function throws.
+
+## Commits and pull requests
+
+- Keep commits small and focused. Write the message as a full sentence ending in a period, in the imperative: "Warn when
+  a renamed profile leaves repos using the old name."
+- Describe what changed and why in the pull request, and note anything you could not test.
+
+## License
+
+By contributing, you agree that your contributions are licensed under the [Apache License 2.0](LICENSE), the same as the
+project.
