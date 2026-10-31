@@ -18,8 +18,6 @@ function parseSshSearch(host: string, stdout: string): { host: string; hostname:
   return { host, hostname };
 }
 
-// TODO(README): `ssh` is a required prerequisite (unlike optional `gpg`) — document that once README.md is out of stash.
-// TODO(README): `Include` directives in ~/.ssh/config are not followed — hosts defined in included files won't be found. Document this limitation once README.md is out of stash.
 async function readConfig(): Promise<string> {
   const path = join(homedir(), '.ssh', 'config');
   return readFile(path, 'utf-8');
