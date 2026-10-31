@@ -9,6 +9,7 @@
   "scripts": {
     "lint": "eslint",
     "test": "c8 mocha 'test/**/*.test.ts'",
+    "test:e2e": "mocha --node-option experimental-test-module-mocks 'test/e2e/**/*.e2e.ts'",
     "typecheck": "tsc"
   },
   "engines": {
