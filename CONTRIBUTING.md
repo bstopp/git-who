@@ -10,7 +10,8 @@ You need Node.js 24 or later, git and ssh (see [Requirements](README.md#requirem
 npm install
 ```
 
-There is no build step. Node runs the TypeScript sources directly, using its built-in type stripping.
+You don't need to build to develop or run the tests. Node runs the TypeScript sources directly, using its built-in type
+stripping. `npm run build` compiles to `dist/`, which is what gets published, so it is only needed to check the package.
 
 ## Checks
 
@@ -22,6 +23,7 @@ Run these before opening a pull request. All of them must pass.
 | `npm run test:e2e` | End-to-end test of the profile lifecycle. |
 | `npm run lint` | ESLint, including the style rules and a complexity cap of 10. |
 | `npm run typecheck` | TypeScript, with no emit. |
+| `npm run build` | Compiles to `dist/`. CI also runs `node dist/bin/git-who.js --version` to check the build starts. |
 
 ## Writing tests
 

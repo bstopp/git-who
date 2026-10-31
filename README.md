@@ -76,6 +76,8 @@ exist, you get a warning and the same prompt.
 
 Run `git who --help` for usage and `git who --version` for the version.
 
+`list`, `show` and `use` also take `--json`, for scripts and AI agents. See [JSON output](#json-output).
+
 ### `add`
 
 Prompts for, in order:
@@ -166,6 +168,77 @@ marks the differences. Run `git who use` in a repo to refresh it.
 Shows the profile and asks for confirmation. If the profile is the active one in the current repo, you are asked a second
 time and its `gitwho.profile` is cleared from that repo afterwards. Other repos that still name the removed profile are
 not touched.
+
+## JSON output
+
+`list`, `show` and `use` take `--json`, which prints the result as JSON on stdout so a script or an AI agent can read it.
+With `--json` nothing is printed except the JSON: no blank lines, no colors, and no warnings on stderr. What a warning
+would have said is a field in the output instead.
+
+`add`, `edit` and `remove` are interactive and do not take `--json`.
+
+| Command | Output |
+| --- | --- |
+| `git who list --json` | An array of profiles. Each has the profile's fields and `active`, true for the profile in use in the current repo. |
+| `git who show [name] --json` | `{ profile, derived, signingKeyStatus, mismatches }` |
+| `git who use <name> --json` | `{ profile, originUpdated, origin }` |
+
+A field with no value is left out of the object. `signingMethod` and `signingKey` are absent for a profile that doesn't
+sign.
+
+```
+$ git who show --json
+{
+  "profile": {
+    "name": "work",
+    "host": "github-work",
+    "username": "Bryan Work",
+    "email": "bryan@work.com",
+    "signingMethod": "ssh",
+    "signingKey": "/Users/bryan/.ssh/id_work.pub"
+  },
+  "derived": false,
+  "signingKeyStatus": { "found": true },
+  "mismatches": { "email": "bryan@personal.com" }
+}
+```
+
+- **`derived`** is true when the profile was matched from the repo's `user.name` and `user.email`, not named by
+  `gitwho.profile`.
+- **`signingKeyStatus`** is only present for a profile that signs. `found` is false when the key isn't on this machine.
+  For GPG, `uids` lists the identities on the key.
+- **`mismatches`** is only present when the profile comes from the repo (`show` with no name). It lists the fields where
+  the repo's git config differs from the profile, with the value git has. `null` means git has nothing set. An empty
+  object means the repo matches the profile.
+
+### `use --json`
+
+`use --json` never prompts, so it needs a profile name and fails without one. The prompt for a mismatched `origin` is
+replaced by a flag:
+
+- Without `--update-origin`, `origin` is left alone. If it doesn't use the profile's SSH host, the output has
+  `origin: { current, expected }` and `originUpdated` is false.
+- With `--update-origin`, `origin` is rewritten to `expected` and `originUpdated` is true.
+
+`--update-origin` also works without `--json`, where it answers yes to the prompt.
+
+### Errors
+
+With `--json`, a failure is printed as JSON on stdout and the exit code is still `1`:
+
+```
+{
+  "error": "Failed to apply profile 'work'. Git config may be partly updated; re-run to retry.",
+  "causes": ["addConfig failed"]
+}
+```
+
+`causes` holds the messages of the wrapped errors, outermost first, and is empty when there are none.
+
+### Agent skill
+
+The package includes a skill that teaches an AI agent to use these commands: `skills/git-who/SKILL.md`, in the installed
+package. Copy or link the `git-who` folder into your agent's skills directory (for Claude Code, `~/.claude/skills/`).
 
 ## Where profiles are stored
 
