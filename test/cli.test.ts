@@ -5,7 +5,7 @@ import { ExitPromptError } from '@inquirer/core';
 type Call = unknown[];
 
 describe('cli.ts', () => {
-  const commands = ['show', 'list', 'use', 'add', 'edit', 'remove', 'clone'] as const;
+  const commands = ['show', 'list', 'use', 'check', 'add', 'edit', 'remove', 'clone'] as const;
   let calls: Record<string, Call[]>;
   let showError: unknown;
   let logErrorCalls: string[];
@@ -25,6 +25,10 @@ describe('cli.ts', () => {
     ]));
     const cli = await esmock<typeof import('../src/cli.ts')>('../src/cli.ts', {
       ...commandMocks,
+      '../src/commands/hook.ts': {
+        install: async (...args: unknown[]) => calls.install.push(args),
+        uninstall: async (...args: unknown[]) => calls.uninstall.push(args),
+      },
       '../src/utils/log.ts': {
         default: {
           error: (msg: string) => logErrorCalls.push(msg),
@@ -45,7 +49,7 @@ describe('cli.ts', () => {
   };
 
   beforeEach(() => {
-    calls = Object.fromEntries(commands.map((name) => [name, []]));
+    calls = Object.fromEntries([...commands, 'install', 'uninstall'].map((name) => [name, []]));
     showError = undefined;
     logErrorCalls = [];
     logJsonCalls = [];
@@ -66,9 +70,16 @@ describe('cli.ts', () => {
       });
     }
 
-    for (const name of ['list', 'add'] as const) {
+    for (const name of ['list', 'check', 'add'] as const) {
       it(`calls ${name}`, async () => {
         await parse([name]);
+        assert.equal(calls[name].length, 1);
+      });
+    }
+
+    for (const name of ['install', 'uninstall'] as const) {
+      it(`calls hook ${name}`, async () => {
+        await parse(['hook', name]);
         assert.equal(calls[name].length, 1);
       });
     }
@@ -94,6 +105,11 @@ describe('cli.ts', () => {
     it('passes --json to list', async () => {
       await parse(['list', '--json']);
       assert.deepEqual(calls.list[0][0], { json: true });
+    });
+
+    it('passes --json to check', async () => {
+      await parse(['check', '--json']);
+      assert.deepEqual(calls.check[0][0], { json: true });
     });
 
     it('passes --json and --update-origin to use', async () => {

@@ -19,9 +19,11 @@ Always pass `--json` and read stdout. Without it the commands print text meant f
 | `git who show --json` | Check the current repo against its profile. |
 | `git who show <name> --json` | Read one profile's details. |
 | `git who use <name> --json` | Apply a profile to the current repo. |
+| `git who check --json` | Pass or fail: does the current repo match its profile? Exits non-zero, with the differences in the error, if not. |
 
 Never run `git who add`, `edit` or `remove`. They are interactive and meant for the user. If a profile is missing or
-wrong, tell the user and let them run those.
+wrong, tell the user and let them run those. Do not run `git who hook install` or `hook uninstall` either: they change
+what every commit in the repo does, so that is the user's decision.
 
 ## Checking a repo
 
@@ -75,6 +77,7 @@ errors, outermost first.
 | `The current directory must have a git repository to use a profile.` | Run it from inside the repo. |
 | `No profiles found. ...` | Nothing is set up. The user has to run `git who add`. |
 | `... key '...' not found for profile '...'` | The profile's signing key is missing. Tell the user. Do not work around it. |
+| `Git config does not match profile '<name>': ...` | From `check`, or from a commit stopped by the user's pre-commit hook. If `<name>` is clearly the right profile, run `git who use <name> --json` and retry the commit. If not, ask the user. |
 | `Failed to apply profile ...` | The git config may be partly updated. Run `git who show --json` to see what is left, then retry `use`. |
 
 ## Rules
@@ -83,4 +86,6 @@ errors, outermost first.
   drifted.
 - Do not edit `user.name`, `user.email` or the signing settings with `git config` to get around a `git who` error.
   Report the error instead.
+- Do not use `git commit --no-verify` to get past a stopped commit. The hook is there to catch the wrong identity, so
+  fix the identity or ask the user.
 - Do not edit `~/.git-who.cfg.json` or the `gitwho.profile` setting by hand.

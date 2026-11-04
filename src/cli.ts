@@ -4,6 +4,8 @@ import pkg from '../package.json' with { type: 'json' };
 import show from './commands/show.ts';
 import list from './commands/list.ts';
 import use from './commands/use.ts';
+import check from './commands/check.ts';
+import { install, uninstall } from './commands/hook.ts';
 import add from './commands/add.ts';
 import edit from './commands/edit.ts';
 import remove from './commands/remove.ts';
@@ -38,6 +40,26 @@ program
   .option('--json', 'Print the result as JSON, without prompting (a profile name is required)')
   .option('--update-origin', 'Update the origin remote to match the profile, without asking')
   .action(use);
+
+program
+  .command('check')
+  .description('Check that the git config of this repo matches its profile, failing if not. For use in a pre-commit hook.')
+  .option('--json', 'Print the result as JSON')
+  .action(check);
+
+const hook = program
+  .command('hook')
+  .description('Manage the pre-commit hook that runs `git who check` in this repo.');
+
+hook
+  .command('install')
+  .description('Run `git who check` before each commit in this repo.')
+  .action(() => install());
+
+hook
+  .command('uninstall')
+  .description('Stop running `git who check` before each commit in this repo.')
+  .action(() => uninstall());
 
 program
   .command('add')
