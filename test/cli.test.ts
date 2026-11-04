@@ -5,7 +5,7 @@ import { ExitPromptError } from '@inquirer/core';
 type Call = unknown[];
 
 describe('cli.ts', () => {
-  const commands = ['show', 'list', 'use', 'check', 'add', 'edit', 'remove', 'clone'] as const;
+  const commands = ['show', 'list', 'use', 'check', 'add', 'edit', 'remove', 'clone', 'completion', 'complete'] as const;
   let calls: Record<string, Call[]>;
   let showError: unknown;
   let logErrorCalls: string[];
@@ -83,6 +83,32 @@ describe('cli.ts', () => {
         assert.equal(calls[name].length, 1);
       });
     }
+
+    for (const shell of ['zsh', 'bash']) {
+      it(`calls completion with ${shell}`, async () => {
+        await parse(['completion', shell]);
+        assert.equal(calls.completion.length, 1);
+        assert.equal(calls.completion[0][0], shell);
+      });
+    }
+
+    it('rejects a shell that completion does not support', async () => {
+      await assert.rejects(() => parse(['completion', 'fish']), { code: 'commander.invalidArgument' });
+      assert.equal(calls.completion.length, 0);
+    });
+
+    it('calls the hidden complete command with the words after --', async () => {
+      await parse(['__complete', '--', 'use', '--js']);
+      assert.equal(calls.complete.length, 1);
+      assert.deepEqual(calls.complete[0][0], ['use', '--js']);
+    });
+
+    it('lists completion in the help, but not the hidden complete command', async () => {
+      const { program } = await loadCli();
+      const names = program.createHelp().visibleCommands(program).map((command) => command.name());
+      assert.ok(names.includes('completion'));
+      assert.ok(!names.includes('__complete'));
+    });
 
     it('calls clone with the repo and no name when only the repo is given', async () => {
       await parse(['clone', 'org/repo']);

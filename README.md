@@ -76,6 +76,7 @@ exist, you get a warning and the same prompt.
 | `git who clone <repo> [name]` | Clone a repo using a profile, then apply the profile to the clone. |
 | `git who edit [name]` | Edit a profile. The prompts are pre-filled with the current values. |
 | `git who remove [name]` | Remove a profile, after confirmation. |
+| `git who completion <shell>` | Print the tab completion script for `zsh` or `bash`. See [Shell completion](#shell-completion). |
 
 Run `git who --help` for usage and `git who --version` for the version.
 
@@ -210,6 +211,29 @@ marks the differences. Run `git who use` in a repo to refresh it.
 Shows the profile and asks for confirmation. If the profile is the active one in the current repo, you are asked a second
 time and its `gitwho.profile` is cleared from that repo afterwards. Other repos that still name the removed profile are
 not touched.
+
+## Shell completion
+
+`git who <TAB>` can complete commands, flags and profile names, in zsh and bash. Add one line to your shell's startup
+file:
+
+```sh
+# ~/.zshrc, after compinit
+eval "$(git who completion zsh)"
+
+# ~/.bashrc, after git's own completion is loaded
+eval "$(git who completion bash)"
+```
+
+It works through git's own completion, which has to be loaded for `git who` to complete. In zsh that is `compinit`, with
+git's completion on your `fpath` (a Homebrew git puts it there). In bash it is the `git-completion.bash` that comes with
+git. Profile names are read from `~/.git-who.cfg.json` each time you press tab, so a new profile completes straight away.
+If that file is missing or can't be read, only the profile names are left out.
+
+It is tested in zsh with Homebrew's git. Other setups, such as bash or a zsh without git's wrapper, follow git's
+documented conventions but haven't been tried by hand, so they may not complete yet. If one doesn't, an
+[issue](https://github.com/bstopp/git-who/issues) with your shell, its version and how git's completion is installed
+helps.
 
 ## JSON output
 

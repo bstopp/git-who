@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { Argument, Command } from 'commander';
 import { ExitPromptError } from '@inquirer/core';
 import pkg from '../package.json' with { type: 'json' };
 import show from './commands/show.ts';
@@ -10,6 +10,9 @@ import add from './commands/add.ts';
 import edit from './commands/edit.ts';
 import remove from './commands/remove.ts';
 import clone from './commands/clone.ts';
+import completion from './commands/completion.ts';
+import complete from './commands/complete.ts';
+import { SHELLS } from './utils/completion.ts';
 import log from './utils/log.ts';
 
 const SIGINT_EXIT_CODE = 130; // 128 + SIGINT, the shell convention for an interrupted command
@@ -80,6 +83,18 @@ program
   .command('clone <repo> [name]')
   .description('Clone a remote repo using a specific profile.')
   .action(clone);
+
+program
+  .command('completion')
+  .description('Print the shell completion script, for `eval "$(git who completion <shell>)"` in your shell startup file.')
+  .addArgument(new Argument('<shell>').choices(SHELLS))
+  .action(completion);
+
+// Called by the completion scripts, with the words typed after `git who` following a `--`.
+program
+  .command('__complete', { hidden: true })
+  .argument('[words...]')
+  .action(complete);
 /**
  * The message of an error followed by those of its `cause` chain, so wrapped failures show the real reason.
  */

@@ -23,6 +23,13 @@ const log = {
   },
 
   /**
+   * Writes text to stdout exactly as given, with no blank lines or colors, for output that a shell reads.
+   */
+  raw(text: string) {
+    console.log(text);
+  },
+
+  /**
    * Writes a value to stdout as indented JSON, with no blank lines or colors so the output can be parsed as is.
    */
   json(value: unknown) {
