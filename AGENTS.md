@@ -18,6 +18,6 @@ conventions and [README.md](README.md) for what the tool does.
   complexity cap of 10 and the function length limit.
 - **Don't add a custom `Error` subclass** unless a caller needs `instanceof`. When one error wraps another, pass the
   original as `cause`.
-- **`list`, `show` and `use` take `--json`** for agents. `add`, `edit` and `remove` are interactive and must not. Don't
+- **`list`, `show`, `use` and `check` take `--json`** for agents. `add`, `edit` and `remove` are interactive and must not. Don't
   make a command that prompts available through `--json` without removing the prompt.
 - **Don't push or publish.** Releases are made by CI from `main`.

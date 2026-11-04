@@ -2,11 +2,9 @@ import assert from 'node:assert/strict';
 import { strict as esmock } from 'esmock';
 import type { SimpleGit } from 'simple-git';
 import {
-  ambiguousProfiles,
   multiProfiles,
   personalProfile,
   validProfile,
-  validProfiles,
   validProfileWithGpgKey,
   validProfileWithSshKey,
   sshKeys,
@@ -14,6 +12,7 @@ import {
 } from '../fixtures.ts';
 import { Profile, SIGNING_METHOD } from '../../src/profile.ts';
 import type { ProfileMismatches, SigningKeyStatus } from '../../src/utils/display.ts';
+import type { ResolvedInfo } from '../../src/utils/repo-profile.ts';
 
 type PrintProfile = typeof import('../../src/utils/display.ts').printProfile;
 type PrintProfileCall = { profile: Profile; opts?: Parameters<PrintProfile>[1] };
@@ -21,41 +20,31 @@ type Mocks = Record<string, object>;
 
 describe('commands/show.ts', async () => {
   let printProfileParam: PrintProfileCall | undefined;
-  let userName: string | null = null;
-  let userEmail: string | null = null;
-  let commitSign: string | null = null;
-  let userSigningKey: string | null = null;
-  let gpgFormat: string | null = null;
   let profiles: Profile[] = multiProfiles;
-  let gitwhoProfile: string | null = null;
+  let resolved: ResolvedInfo | Error = { profile: validProfile, derived: false, mismatches: {} };
+  let resolveCalls = 0;
   const logWarnCalls: string[] = [];
   const logJsonCalls: unknown[] = [];
 
   const fakeGit = {
     checkIsRepo: async () => true,
-    getConfig: async (key: string, scope: string) => {
-      assert.equal(scope, 'local');
-      if (key === 'user.name') {
-        return { value: userName };
-      } else if (key === 'user.email') {
-        return { value: userEmail };
-      } else if (key === 'commit.gpgsign') {
-        return { value: commitSign };
-      } else if (key === 'user.signingKey') {
-        return { value: userSigningKey };
-      } else if (key === 'gpg.format') {
-        return { value: gpgFormat };
-      }
-      return { value: null };
-    },
   } as SimpleGit;
 
   const profilesMock = {
     '../../src/utils/profiles.ts': {
       loadProfiles: async () => profiles,
-      getActiveProfileName: async (git: SimpleGit) => {
-        assert.equal(git, fakeGit, 'getActiveProfileName should receive the simpleGit instance');
-        return gitwhoProfile;
+    },
+  };
+
+  const repoProfileMock = {
+    '../../src/utils/repo-profile.ts': {
+      resolveFromGit: async (given: Profile[]) => {
+        assert.equal(given, profiles, 'resolveFromGit should receive the loaded profiles');
+        resolveCalls++;
+        if (resolved instanceof Error) {
+          throw resolved;
+        }
+        return resolved;
       },
     },
   };
@@ -141,6 +130,7 @@ describe('commands/show.ts', async () => {
       '../../src/commands/show.ts',
       {
         ...profilesMock,
+        ...repoProfileMock,
         ...printProfileMock,
         ...simpleGitMock,
         ...listSshKeysMock,
@@ -154,13 +144,9 @@ describe('commands/show.ts', async () => {
 
   beforeEach(async () => {
     printProfileParam = undefined;
-    userName = null;
-    userEmail = null;
-    commitSign = null;
-    gpgFormat = null;
-    userSigningKey = null;
     profiles = multiProfiles;
-    gitwhoProfile = null;
+    resolved = { profile: validProfile, derived: false, mismatches: {} };
+    resolveCalls = 0;
     logWarnCalls.length = 0;
     logJsonCalls.length = 0;
   });
@@ -187,202 +173,56 @@ describe('commands/show.ts', async () => {
     await assert.rejects(() => show(), { message: 'You must provide a profile name, or invoke the show command from a git repo.' });
   });
 
-  it('throws when unable to find a profile', async () => {
-    gitwhoProfile = null;
+  it('throws when the profile for the repo cannot be resolved', async () => {
+    resolved = new Error('No profile set and none found matching the current git config.');
     const show = await loadShow({
       ...printProfileFail,
     });
-    await assert.rejects(() => show(), { message: 'No profile set and none found matching the current git config.' });
+    await assert.rejects(() => show(), { message: resolved instanceof Error ? resolved.message : '' });
   });
 
-  it('throws when unable to derive unique profile', async () => {
-    profiles = ambiguousProfiles;
-    userName = validProfile.username;
-    userEmail = validProfile.email;
-    const show = await loadShow({
-      ...printProfileFail,
-    });
-    await assert.rejects(() => show(), { message: 'Multiple profiles match the current git config — set one explicitly with `git who use <profile>`.' });
-  });
-
-  it('throws when gitwho.profile is set but invalid and derivation fails', async () => {
-    profiles = validProfiles;
-    userName = personalProfile.username;
-    userEmail = personalProfile.email;
-    gitwhoProfile = 'missing';
-    const show = await loadShow({
-      ...printProfileFail,
-    });
-    await assert.rejects(() => show(), { message: `Active profile '${gitwhoProfile}' not found — it may have been deleted.` });
-  });
-
-  it('throws when gitwho.profile is set but invalid but multiple matches exist', async () => {
-    profiles = ambiguousProfiles;
-    userName = validProfile.username;
-    userEmail = validProfile.email;
-    gitwhoProfile = 'missing';
-    const show = await loadShow({
-      ...printProfileFail,
-    });
-    await assert.rejects(() => show(), { message: `Active profile '${gitwhoProfile}' not found — it may have been deleted.` });
-  });
-
-  it('calls print profile for named profile (no key)', async () => {
+  it('calls print profile for named profile (no key), without resolving from the repo', async () => {
     const show = await loadShow();
     await assert.doesNotReject(() => show(validProfile.name));
     assert.ok(printProfileParam, 'printProfile was not called');
     assert.deepEqual(printProfileParam, { profile: validProfile });
+    assert.equal(resolveCalls, 0);
   });
 
-  it('identifies mismatches when git config values are missing', async () => {
-    gitwhoProfile = validProfile.name;
+  it('passes the mismatches of the profile for the repo to print profile', async () => {
+    const mismatches: ProfileMismatches = { username: personalProfile.username, email: undefined };
+    resolved = { profile: validProfile, derived: false, mismatches };
     const show = await loadShow();
-    await assert.doesNotReject(() => show());
-    assert.ok(printProfileParam, 'printProfile was not called');
-    const mismatches: ProfileMismatches = {
-      username: undefined,
-      email: undefined,
-    };
-
-    assert.deepEqual(printProfileParam, { profile: validProfile, opts: { mismatches } });
-  });
-
-  it('identifies mismatches when git config differs from profile', async () => {
-    userName = personalProfile.username;
-    userEmail = personalProfile.email;
-    profiles = multiProfiles;
-    gitwhoProfile = validProfile.name;
-    const show = await loadShow();
-    const mismatches: ProfileMismatches = {
-      username: personalProfile.username,
-      email: personalProfile.email,
-    };
-
     await assert.doesNotReject(() => show());
     assert.ok(printProfileParam, 'printProfile was not called');
     assert.deepEqual(printProfileParam, { profile: validProfile, opts: { mismatches } });
   });
 
-  it('identifies mismatches when git config indicates signing but profile does not', async () => {
-    userName = validProfile.username;
-    userEmail = validProfile.email;
-    commitSign = 'true';
-    userSigningKey = gpgKeys[1].keyId;
-    gpgFormat = 'openpgp';
-    profiles = ambiguousProfiles;
-    gitwhoProfile = validProfile.name;
+  it('passes no extras to print profile when the repo matches its profile', async () => {
     const show = await loadShow();
-
-    const mismatches: ProfileMismatches = {
-      signingKey: gpgKeys[1].keyId,
-      signingMethod: SIGNING_METHOD.GPG,
-    };
-
     await assert.doesNotReject(() => show());
     assert.ok(printProfileParam, 'printProfile was not called');
-    assert.deepEqual(printProfileParam, { profile: validProfile, opts: { mismatches } });
+    assert.deepEqual(printProfileParam, { profile: validProfile });
   });
 
-  it('treats git signing with no gpg.format as gpg', async () => {
-    userName = validProfile.username;
-    userEmail = validProfile.email;
-    commitSign = 'true';
-    userSigningKey = gpgKeys[1].keyId;
-    profiles = ambiguousProfiles;
-    gitwhoProfile = validProfile.name;
-    const show = await loadShow();
-
-    const mismatches: ProfileMismatches = {
-      signingKey: gpgKeys[1].keyId,
-      signingMethod: SIGNING_METHOD.GPG,
-    };
-
-    await assert.doesNotReject(() => show());
-    assert.ok(printProfileParam, 'printProfile was not called');
-    assert.deepEqual(printProfileParam, { profile: validProfile, opts: { mismatches } });
-  });
-
-  it('identifies mismatches when profile signs but git config does not', async () => {
-    userName = validProfileWithSshKey.username;
-    userEmail = validProfileWithSshKey.email;
-    profiles = [validProfileWithSshKey];
-    gitwhoProfile = validProfileWithSshKey.name;
-    const show = await loadShow({
-      '../../src/utils/ssh.ts': {
-        listSshKeys: async () => sshKeys,
-      },
-    });
-
-    const mismatches: ProfileMismatches = {
-      signingKey: undefined,
-      signingMethod: undefined,
-    };
-    const signingKeyStatus: SigningKeyStatus = { found: true };
-
-    await assert.doesNotReject(() => show());
-    assert.ok(printProfileParam, 'printProfile was not called');
-    assert.deepEqual(printProfileParam, {
-      profile: validProfileWithSshKey,
-      opts: { mismatches, signingKeyStatus },
-    });
-  });
-
-  it('derives profile from git config', async () => {
-    userName = personalProfile.username;
-    userEmail = personalProfile.email;
-    profiles = multiProfiles;
+  it('warns when the profile for the repo was derived from git config', async () => {
+    resolved = { profile: personalProfile, derived: true, mismatches: {} };
     const show = await loadShow({
       ...logMock,
     });
     await assert.doesNotReject(() => show());
     assert.ok(printProfileParam, 'printProfile was not called');
     assert.deepEqual(printProfileParam, { profile: personalProfile });
-    assert.ok(logWarnCalls.includes('Profile derived from git config — not explicitly set via gitwho.profile'));
+    assert.deepEqual(logWarnCalls, ['Profile derived from git config — not explicitly set via gitwho.profile']);
   });
 
-  it('derives profile from git config when gitwho.profile is invalid', async () => {
-    userName = personalProfile.username;
-    userEmail = personalProfile.email;
-    profiles = multiProfiles;
-    gitwhoProfile = 'invalid';
-    const show = await loadShow({
-      ...logMock,
-    });
-    await assert.doesNotReject(() => show());
-    assert.ok(printProfileParam, 'printProfile was not called');
-    assert.deepEqual(printProfileParam, { profile: personalProfile });
-    assert.ok(logWarnCalls.includes('Profile derived from git config — not explicitly set via gitwho.profile'));
-  });
-
-  it('displays message that signing method is mismatch from derived profile (git set, profile not)', async () => {
-    userName = validProfile.username;
-    userEmail = validProfile.email;
-    commitSign = 'true';
-    userSigningKey = validProfileWithSshKey.signingKey!;
-    gpgFormat = 'ssh';
-    profiles = [validProfile];
-    const show = await loadShow({
-      ...logMock,
-    });
+  it('shows the mismatches and the signing key status of a derived profile', async () => {
     const mismatches: ProfileMismatches = {
       signingKey: validProfileWithSshKey.signingKey,
       signingMethod: SIGNING_METHOD.SSH,
     };
-
-    await assert.doesNotReject(() => show());
-    assert.ok(printProfileParam, 'printProfile was not called');
-    assert.deepEqual(printProfileParam, { profile: validProfile, opts: { mismatches } });
-    assert.ok(logWarnCalls.includes('Profile derived from git config — not explicitly set via gitwho.profile'));
-  });
-
-  it('displays message that signing method is mismatch from git config (profile gpg, git ssh)', async () => {
+    resolved = { profile: validProfileWithGpgKey, derived: true, mismatches };
     let listGpgKeysCalled = false;
-    userName = validProfile.username;
-    userEmail = validProfile.email;
-    commitSign = 'true';
-    gpgFormat = 'ssh';
-    userSigningKey = validProfileWithSshKey.signingKey!;
-    profiles = [validProfileWithGpgKey];
     const show = await loadShow({
       '../../src/utils/gpg.ts': {
         listGpgKeys: async (query: string) => {
@@ -393,11 +233,6 @@ describe('commands/show.ts', async () => {
       },
       ...logMock,
     });
-
-    const mismatches: ProfileMismatches = {
-      signingKey: validProfileWithSshKey.signingKey,
-      signingMethod: SIGNING_METHOD.SSH,
-    };
     const signingKeyStatus: SigningKeyStatus = {
       found: true,
       uids: gpgKeys[0].uids,
@@ -406,7 +241,25 @@ describe('commands/show.ts', async () => {
     assert.ok(listGpgKeysCalled, 'listGpgKeys was not called');
     assert.ok(printProfileParam, 'printProfile was not called');
     assert.deepEqual(printProfileParam, { profile: validProfileWithGpgKey, opts: { mismatches, signingKeyStatus } });
-    assert.ok(logWarnCalls.includes('Profile derived from git config — not explicitly set via gitwho.profile'));
+    assert.equal(logWarnCalls.length, 1);
+  });
+
+  it('looks up the signing key of the profile for the repo', async () => {
+    const mismatches: ProfileMismatches = { signingKey: undefined, signingMethod: undefined };
+    resolved = { profile: validProfileWithSshKey, derived: false, mismatches };
+    const show = await loadShow({
+      '../../src/utils/ssh.ts': {
+        listSshKeys: async () => sshKeys,
+      },
+    });
+    const signingKeyStatus: SigningKeyStatus = { found: true };
+
+    await assert.doesNotReject(() => show());
+    assert.ok(printProfileParam, 'printProfile was not called');
+    assert.deepEqual(printProfileParam, {
+      profile: validProfileWithSshKey,
+      opts: { mismatches, signingKeyStatus },
+    });
   });
 
   it('calls print profile for named profile (ssh key)', async () => {
@@ -536,9 +389,6 @@ describe('commands/show.ts', async () => {
     });
 
     it('prints no mismatches when the repo config matches the profile', async () => {
-      gitwhoProfile = validProfile.name;
-      userName = validProfile.username;
-      userEmail = validProfile.email;
       await assert.doesNotReject(() => showJson());
       assert.deepEqual(logJsonCalls, [{
         profile: validProfile,
@@ -549,7 +399,7 @@ describe('commands/show.ts', async () => {
     });
 
     it('marks the fields git has nothing for as null, so they are not dropped', async () => {
-      gitwhoProfile = validProfile.name;
+      resolved = { profile: validProfile, derived: false, mismatches: { username: undefined, email: undefined } };
       await assert.doesNotReject(() => showJson());
       assert.deepEqual(logJsonCalls, [{
         profile: validProfile,
@@ -560,9 +410,11 @@ describe('commands/show.ts', async () => {
     });
 
     it('prints the values git has where they differ from the profile', async () => {
-      gitwhoProfile = validProfile.name;
-      userName = personalProfile.username;
-      userEmail = personalProfile.email;
+      resolved = {
+        profile: validProfile,
+        derived: false,
+        mismatches: { username: personalProfile.username, email: personalProfile.email },
+      };
       await assert.doesNotReject(() => showJson());
       assert.deepEqual(logJsonCalls, [{
         profile: validProfile,
@@ -573,8 +425,7 @@ describe('commands/show.ts', async () => {
     });
 
     it('flags a profile derived from the git config, without warning', async () => {
-      userName = validProfile.username;
-      userEmail = validProfile.email;
+      resolved = { profile: validProfile, derived: true, mismatches: {} };
       await assert.doesNotReject(() => showJson());
       assert.deepEqual(logJsonCalls, [{
         profile: validProfile,

@@ -70,13 +70,16 @@ exist, you get a warning and the same prompt.
 | `git who list` | List all profiles with their SSH hosts. The profile active in the current repo is in bold. |
 | `git who show [name]` | Show a profile. With no name, show the profile for the current repo. |
 | `git who use [name]` | Apply a profile to the current repo. |
+| `git who check` | Fail if the current repo's git config doesn't match its profile. |
+| `git who hook install` | Run `check` before every commit in the current repo. See [Pre-commit hook](#pre-commit-hook). |
+| `git who hook uninstall` | Stop running `check` before commits in the current repo. |
 | `git who clone <repo> [name]` | Clone a repo using a profile, then apply the profile to the clone. |
 | `git who edit [name]` | Edit a profile. The prompts are pre-filled with the current values. |
 | `git who remove [name]` | Remove a profile, after confirmation. |
 
 Run `git who --help` for usage and `git who --version` for the version.
 
-`list`, `show` and `use` also take `--json`, for scripts and AI agents. See [JSON output](#json-output).
+`list`, `show`, `use` and `check` also take `--json`, for scripts and AI agents. See [JSON output](#json-output).
 
 ### `add`
 
@@ -89,6 +92,45 @@ Prompts for, in order:
    - **GPG**: pick a secret key, and then an identity on that key. If the key has only one identity it is used
      directly. The identity's name and email become the defaults for the next two prompts.
 4. **Git `user.name`** and **`user.email`**.
+
+### `check`
+
+Checks the current repo's git config against its profile (the one named by `gitwho.profile`, or the one matching
+`user.name` and `user.email`) and exits non-zero if they differ. It compares `user.name`, `user.email`, `user.signingKey`
+and whether commits are signed, and the error names each setting that differs. It prints nothing when the repo matches,
+and never prompts.
+
+To stop a commit made under the wrong identity, run it before every commit with a
+[pre-commit hook](#pre-commit-hook). A repo with no profile, or whose identity matches none, fails the check too.
+
+### Pre-commit hook
+
+`git who hook install` makes git run `git who check` before every commit in the current repo, and a commit under the
+wrong identity is refused with the settings that differ. `git who hook uninstall` takes it out again. Both only touch the
+repo's local git config.
+
+It uses git's config hooks (`hook.git-who.command` and `hook.git-who.event`), not a file in `.git/hooks`, so it runs
+alongside any `pre-commit` hook the repo already has and never overwrites it. It needs a git recent enough to have them.
+After installing, `git who` checks that `git hook list pre-commit` shows the hook, and if it doesn't it removes the
+config again and tells you, rather than leaving a hook that never runs.
+
+To do the same by hand:
+
+```
+git config --local hook.git-who.command 'git who check'
+git config --local hook.git-who.event pre-commit
+```
+
+If you use [husky](https://typicode.github.io/husky), the hook above works with it as is. Or put the command in husky's
+own hook instead, by adding this line to `.husky/pre-commit`:
+
+```
+git who check
+```
+
+`git commit --no-verify` skips the hook, because git skips `pre-commit` hooks with it. The hook is a guard against
+forgetting to switch profiles, not something that enforces it. It also fails the commit if `git who` isn't on the
+`PATH`, such as after uninstalling the tool without running `git who hook uninstall`.
 
 ### `use`
 
@@ -171,7 +213,7 @@ not touched.
 
 ## JSON output
 
-`list`, `show` and `use` take `--json`, which prints the result as JSON on stdout so a script or an AI agent can read it.
+`list`, `show`, `use` and `check` take `--json`, which prints the result as JSON on stdout so a script or an AI agent can read it.
 With `--json` nothing is printed except the JSON: no blank lines, no colors, and no warnings on stderr. What a warning
 would have said is a field in the output instead.
 
@@ -182,6 +224,7 @@ would have said is a field in the output instead.
 | `git who list --json` | An array of profiles. Each has the profile's fields and `active`, true for the profile in use in the current repo. |
 | `git who show [name] --json` | `{ profile, derived, signingKeyStatus, mismatches }` |
 | `git who use <name> --json` | `{ profile, originUpdated, origin }` |
+| `git who check --json` | `{ profile, derived }` when the repo matches its profile. A mismatch is an error, like any other failure. |
 
 A field with no value is left out of the object. `signingMethod` and `signingKey` are absent for a profile that doesn't
 sign.
