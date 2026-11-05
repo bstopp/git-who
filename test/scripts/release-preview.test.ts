@@ -87,6 +87,14 @@ describe('scripts/release-preview.ts', () => {
       }
     });
 
+    it('is the marker and one line saying what the release would be, and nothing else', () => {
+      for (const type of ['major', 'minor', 'patch', null] as const) {
+        const lines = comment(type, latest).split('\n');
+        assert.equal(lines.length, 2);
+        assert.ok(lines[1].startsWith('**Release preview:**'));
+      }
+    });
+
     it('says there is no release when the title does not trigger one', () => {
       assert.match(comment(null, latest), /will not publish a release/);
     });

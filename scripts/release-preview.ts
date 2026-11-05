@@ -53,12 +53,7 @@ export function nextVersion(tag: string, type: ReleaseType): string {
 export function comment(type: ReleaseType | null, latestTag?: string): string {
   const versions = latestTag && type ? `: ${latestTag} → ${nextVersion(latestTag, type)}` : '';
   const outcome = type ? `publish a **${type}** release${versions}` : 'not publish a release';
-  return [
-    MARKER,
-    `**Release preview:** merging this pull request will ${outcome}.`,
-    '',
-    'This follows the pull request title, which becomes the commit message when the pull request is squash merged, and it updates when the title changes.',
-  ].join('\n');
+  return [MARKER, `**Release preview:** merging this pull request will ${outcome}.`].join('\n');
 }
 
 if (import.meta.main) {
