@@ -34,7 +34,7 @@ jobs:
         env:
           # Passed through the environment, not pasted into the script, so a title cannot inject commands.
           TITLE: ${{ github.event.pull_request.title }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
           # No release yet is not an error, so the preview just leaves the versions out.
@@ -45,7 +45,7 @@ jobs:
       - name: Comment on the pull request
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
