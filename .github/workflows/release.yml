@@ -16,8 +16,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  # Works out whether there is anything to release. The release job waits for approval to use its environment, so it only
+  # starts when this says there is, and a merge that does not release anything never asks for approval.
+  plan:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }} # the commit CI passed on, not whatever main is now
+          fetch-depth: 0 # the commits since the last release, and the tags
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Uses the same analyzer and config as semantic-release, over every commit since the last release.
+      - id: plan
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/release-needed.ts
+
+  release:
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
     runs-on: ubuntu-latest
     # The environment is restricted to main, and is the one the npm trusted publisher is set up for.
     environment: release
