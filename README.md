@@ -1,5 +1,10 @@
 # git-who
 
+[![CI](https://github.com/bstopp/git-who/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bstopp/git-who/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@bstopp/git-who)](https://www.npmjs.com/package/@bstopp/git-who)
+[![License](https://img.shields.io/npm/l/@bstopp/git-who)](LICENSE)
+[![Node](https://img.shields.io/node/v/@bstopp/git-who)](https://nodejs.org)
+
 Manage git profiles for per-project SSH account configuration.
 
 If you use more than one git account (work, personal, a client), `git who` keeps each one as a named **profile** and

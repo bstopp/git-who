@@ -28,7 +28,7 @@ export default [
     },
   },
   {
-    files: ['src/**/*.ts', 'bin/**/*.ts'],
+    files: ['src/**/*.ts', 'bin/**/*.ts', 'scripts/**/*.ts'],
     languageOptions: {
       globals: { process: 'readonly', console: 'readonly' },
     },

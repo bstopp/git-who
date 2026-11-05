@@ -1,0 +1,60 @@
+name: Release preview
+
+# Comments on a pull request with the release that merging it would make. With squash merging the title becomes the
+# commit message, and the same commit analyzer that semantic-release uses reads it, with the config from .releaserc.json.
+#
+# This runs on pull_request, not pull_request_target, so it runs the pull request's own code with a token that is
+# read-only for pull requests from forks and Dependabot. Don't change the trigger without reading
+# https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target first.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write # to post the comment; a read-only token for forks makes that step fail, which is tolerated
+
+concurrency:
+  group: release-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Work out the release
+        env:
+          # Passed through the environment, not pasted into the script, so a title cannot inject commands.
+          TITLE: ${{ github.event.pull_request.title }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          # No release yet is not an error, so the preview just leaves the versions out.
+          LATEST_TAG=$(gh api "repos/$REPO/releases/latest" --jq .tag_name 2>/dev/null || true)
+          export LATEST_TAG
+          node scripts/release-preview.ts | tee "$RUNNER_TEMP/comment.md" >> "$GITHUB_STEP_SUMMARY"
+      # Fails for a fork or Dependabot, whose token cannot comment. The preview is in the job summary either way.
+      - name: Comment on the pull request
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # The marker is the first line of the comment, and must match MARKER in scripts/release-preview.ts.
+          marker='<!-- release-preview -->'
+          id=$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
+          if [[ -n "$id" ]]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$id" -F body=@"$RUNNER_TEMP/comment.md"
+          else
+            gh api --method POST "repos/$REPO/issues/$PR/comments" -F body=@"$RUNNER_TEMP/comment.md"
+          fi
