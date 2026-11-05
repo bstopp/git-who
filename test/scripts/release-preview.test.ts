@@ -1,8 +1,24 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { analyzerConfig, comment, MARKER, nextVersion, releaseType, type ReleaseType } from '../../scripts/release-preview.ts';
 
 describe('scripts/release-preview.ts', () => {
   const analyzer = '@semantic-release/commit-analyzer';
+  const notes = '@semantic-release/release-notes-generator';
+  type Releaserc = { plugins: unknown[] };
+  let releaserc: Releaserc;
+  let repoConfig: object;
+
+  // The config the release itself uses, so that these tests describe what merging a title really does here.
+  before(async () => {
+    releaserc = JSON.parse(await readFile('.releaserc.json', 'utf8'));
+    repoConfig = analyzerConfig(releaserc);
+  });
+
+  const pluginConfig = (name: string) => {
+    const entry = releaserc.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === name);
+    return Array.isArray(entry) ? entry[1] : undefined;
+  };
 
   describe('analyzerConfig', () => {
     it('is empty when the analyzer is listed by name only', () => {
@@ -26,10 +42,8 @@ describe('scripts/release-preview.ts', () => {
       ['feat(cli): add a command', 'minor'],
       ['fix: handle an empty config', 'patch'],
       ['perf: read the config once', 'patch'],
-      // The default angular preset does not read the ! in a header, so semantic-release makes no release from these,
-      // although CONTRIBUTING.md says it makes a major. If the release config changes to read it, these become major.
-      ['feat!: rename the config file', null],
-      ['fix(cli)!: change the exit code', null],
+      ['feat!: rename the config file', 'major'],
+      ['fix(cli)!: change the exit code', 'major'],
       ['docs: describe the build step', null],
       ['chore: update dependencies', null],
       ['ci: pin the actions', null],
@@ -42,17 +56,26 @@ describe('scripts/release-preview.ts', () => {
 
     for (const [title, expected] of cases) {
       it(`reads '${title}' as ${expected ?? 'no release'}`, async () => {
-        assert.equal(await releaseType(title), expected);
+        assert.equal(await releaseType(title, repoConfig), expected);
       });
     }
 
     it('reads a BREAKING CHANGE footer as a major release', async () => {
-      assert.equal(await releaseType('feat: rename the config file\n\nBREAKING CHANGE: the file is now .git-who.json'), 'major');
+      assert.equal(await releaseType('feat: rename the config file\n\nBREAKING CHANGE: the file is now .git-who.json', repoConfig), 'major');
     });
 
     it('follows the config it is given', async () => {
       const config = { releaseRules: [{ type: 'docs', release: 'patch' }] };
       assert.equal(await releaseType('docs: describe the build step', config), 'patch');
+    });
+  });
+
+  describe('.releaserc.json', () => {
+    it('gives the commit analyzer and the release notes the same preset, so they read commits the same way', () => {
+      const analyzerPreset = (pluginConfig(analyzer) as { preset?: string } | undefined)?.preset;
+      const notesPreset = (pluginConfig(notes) as { preset?: string } | undefined)?.preset;
+      assert.ok(analyzerPreset, 'the commit analyzer should name a preset');
+      assert.equal(notesPreset, analyzerPreset);
     });
   });
 
