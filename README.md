@@ -78,7 +78,7 @@ exist, you get a warning and the same prompt.
 | `git who check` | Fail if the current repo's git config doesn't match its profile. |
 | `git who hook install` | Run `check` before every commit in the current repo. See [Pre-commit hook](#pre-commit-hook). |
 | `git who hook uninstall` | Stop running `check` before commits in the current repo. |
-| `git who clone <repo> [name]` | Clone a repo using a profile, then apply the profile to the clone. |
+| `git who clone <repo> [name]` | Clone a repo using a profile, then apply the profile to the clone. `--hook` also installs the [pre-commit hook](#pre-commit-hook). |
 | `git who edit [name]` | Edit a profile. The prompts are pre-filled with the current values. |
 | `git who remove [name]` | Remove a profile, after confirmation. |
 | `git who completion <shell>` | Print the tab completion script for `zsh` or `bash`. See [Shell completion](#shell-completion). |
@@ -162,7 +162,7 @@ Notes:
 ### `clone`
 
 ```
-git who clone <repo> [name]
+git who clone <repo> [name] [--hook]
 ```
 
 `<repo>` can be:
@@ -177,6 +177,10 @@ profile is applied to the clone.
 The profile's signing key is checked **before** cloning, so a missing key fails without cloning anything. If the clone
 succeeds but writing the profile to its git config then fails, the repo is left cloned. The error tells you to run
 `git who use <name>` inside it.
+
+With `--hook`, the [pre-commit hook](#pre-commit-hook) is also installed in the clone once the profile is applied. If
+that fails, the repo is left cloned with the profile applied, and the error tells you to run `git who hook install`
+inside it.
 
 ### `show`
 

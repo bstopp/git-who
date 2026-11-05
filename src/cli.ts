@@ -82,6 +82,7 @@ program
 program
   .command('clone <repo> [name]')
   .description('Clone a remote repo using a specific profile.')
+  .option('--hook', 'Also install the pre-commit hook in the clone')
   .action(clone);
 
 program
