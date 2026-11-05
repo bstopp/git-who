@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { simpleGit } from 'simple-git';
 import { applyProfile, loadProfiles, verifySigningKey } from '../utils/profiles.ts';
 import { selectProfile } from '../utils/prompts.ts';
+import { install } from './hook.ts';
 import { parseSshUrl } from '../utils/git-url.ts';
 import log from '../utils/log.ts';
 
@@ -31,9 +32,11 @@ function getCloneInfo(host: string, repo: string) {
  * host is always replaced with the profile's.
  * @throws {Error} If the repo format is not supported, the profile's signing key is missing or cannot be looked up, or
  * the clone fails. The signing key is checked before cloning, so its failure leaves nothing behind. A failure to apply
- * the profile after a successful clone is wrapped with its `cause`, as the repo is left cloned without the profile.
+ * the profile after a successful clone is wrapped with its `cause`, as the repo is left cloned without the profile. The
+ * same goes for a failure to install the hook, which leaves the repo cloned with the profile applied.
+ * @param options.hook - Also install the pre-commit hook in the clone, once the profile is applied.
  */
-export default async function clone(repo: string, name?: string): Promise<void> {
+export default async function clone(repo: string, name?: string, options: { hook?: boolean } = {}): Promise<void> {
   const profiles = await loadProfiles();
   const profile = await selectProfile(profiles, name);
   const { url, dir } = getCloneInfo(profile.host, repo);
@@ -47,6 +50,17 @@ export default async function clone(repo: string, name?: string): Promise<void> 
       `Cloned '${dir}', but profile '${profile.name}' could not be applied. Run \`git who use ${profile.name}\` inside it to retry.`,
       { cause: error },
     );
+  }
+
+  if (options.hook) {
+    try {
+      await install(dir);
+    } catch (error) {
+      throw new Error(
+        `Cloned '${dir}' and applied profile '${profile.name}', but the hook could not be installed. Run \`git who hook install\` inside it to retry.`,
+        { cause: error },
+      );
+    }
   }
   log.info(`Cloned ${chalk.bold(url)} to ${dir} using profile ${chalk.bold(profile.name)}.`);
 }

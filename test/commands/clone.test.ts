@@ -20,6 +20,8 @@ describe('commands/clone.ts', () => {
   let events: string[] = [];
   let applyProfileError: Error | undefined;
   let applyProfileCall: { git: SimpleGit; profile: Profile; extraArgs: unknown[] } | undefined;
+  let installError: Error | undefined;
+  let installCalls: (string | undefined)[] = [];
   const logInfoCalls: string[] = [];
 
   const cloningGit = {
@@ -80,6 +82,18 @@ describe('commands/clone.ts', () => {
     },
   };
 
+  const hookMock = {
+    '../../src/commands/hook.ts': {
+      install: async (baseDir?: string) => {
+        events.push('install');
+        installCalls.push(baseDir);
+        if (installError) {
+          throw installError;
+        }
+      },
+    },
+  };
+
   const logMock = {
     '../../src/utils/log.ts': {
       default: {
@@ -103,6 +117,7 @@ describe('commands/clone.ts', () => {
         ...simpleGitMock,
         ...profilesMock,
         ...promptsMock,
+        ...hookMock,
         ...logMock,
         ...chalkMock,
         ...overrides, // same key wins, so it replaces the default
@@ -113,6 +128,10 @@ describe('commands/clone.ts', () => {
 
   const doneMessage = (url: string, dir: string) => {
     return `Cloned [bold]${url}[/bold] to ${dir} using profile [bold]${selected.name}[/bold].`;
+  };
+
+  const hookNotInstalledMessage = (dir: string) => {
+    return `Cloned '${dir}' and applied profile '${selected.name}', but the hook could not be installed. Run \`git who hook install\` inside it to retry.`;
   };
 
   const notAppliedMessage = (dir: string) => {
@@ -132,6 +151,8 @@ describe('commands/clone.ts', () => {
     events = [];
     applyProfileError = undefined;
     applyProfileCall = undefined;
+    installError = undefined;
+    installCalls = [];
     logInfoCalls.length = 0;
   });
 
@@ -188,7 +209,36 @@ describe('commands/clone.ts', () => {
     assert.deepEqual(applyProfileCall, { git: repoGit, profile: selected, extraArgs: [] });
     assert.equal(verifySigningKeyCall, selected);
     assert.deepEqual(events, ['verifySigningKey', 'clone']);
+    assert.deepEqual(installCalls, []);
     assert.deepEqual(logInfoCalls, [doneMessage(url, 'repo')]);
+  });
+
+  it('installs the hook in the clone after applying the profile when asked to', async () => {
+    const clone = await loadClone();
+    await assert.doesNotReject(() => clone('org/repo', selected.name, { hook: true }));
+    const url = `git@${selected.host}:org/repo`;
+    assert.deepEqual(installCalls, ['repo']);
+    assert.deepEqual(events, ['verifySigningKey', 'clone', 'install']);
+    assert.deepEqual(logInfoCalls, [doneMessage(url, 'repo')]);
+  });
+
+  it('does not install the hook when the profile could not be applied', async () => {
+    applyProfileError = new Error('addConfig failed');
+    const clone = await loadClone();
+    await assert.rejects(() => clone('org/repo', selected.name, { hook: true }), { message: notAppliedMessage('repo') });
+    assert.deepEqual(installCalls, []);
+  });
+
+  it('wraps a failure to install the hook after cloning, keeping the cause', async () => {
+    const cause = new Error('Git did not list the hook');
+    installError = cause;
+    const clone = await loadClone();
+    await assert.rejects(() => clone('org/repo', selected.name, { hook: true }), (err: Error) => {
+      assert.equal(err.message, hookNotInstalledMessage('repo'));
+      assert.equal(err.cause, cause);
+      return true;
+    });
+    assert.deepEqual(logInfoCalls, []);
   });
 
   it('clones an org/repo shorthand using the profile host', async () => {

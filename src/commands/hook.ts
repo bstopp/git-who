@@ -32,9 +32,10 @@ async function removeConfig(git: SimpleGit) {
  *
  * @throws {Error} If the current directory is not a git repo, or git does not list the hook once it is set, which
  * means it is too old to run config hooks. The config is put back in that case.
+ * @param baseDir - The directory of the repo to install it in, instead of the current directory.
  */
-export async function install(): Promise<void> {
-  const git = simpleGit();
+export async function install(baseDir?: string): Promise<void> {
+  const git = simpleGit(baseDir);
   if (!await git.checkIsRepo()) {
     throw new Error('The current directory must have a git repository to install the hook.');
   }

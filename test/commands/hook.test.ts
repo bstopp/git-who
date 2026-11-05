@@ -15,6 +15,7 @@ describe('commands/hook.ts', async () => {
   let listOutput: string | Error = `${HOOK_NAME}\n`;
   const addConfigCalls: ConfigCall[] = [];
   const rawCalls: string[][] = [];
+  const simpleGitCalls: (string | undefined)[] = [];
   const logInfoCalls: string[] = [];
 
   const fakeGit = {
@@ -42,7 +43,12 @@ describe('commands/hook.ts', async () => {
     },
   } as unknown as SimpleGit;
 
-  const simpleGitMock = { 'simple-git': { simpleGit: () => fakeGit } };
+  const simpleGitMock = { 'simple-git': {
+    simpleGit: (baseDir?: string) => {
+      simpleGitCalls.push(baseDir);
+      return fakeGit;
+    },
+  } };
 
   const logMock = {
     '../../src/utils/log.ts': {
@@ -67,6 +73,7 @@ describe('commands/hook.ts', async () => {
     listOutput = `${HOOK_NAME}\n`;
     addConfigCalls.length = 0;
     rawCalls.length = 0;
+    simpleGitCalls.length = 0;
     logInfoCalls.length = 0;
   });
 
@@ -87,6 +94,12 @@ describe('commands/hook.ts', async () => {
       ]);
       assert.deepEqual(rawCalls, [['hook', 'list', 'pre-commit']]);
       assert.deepEqual(logInfoCalls, ['Installed the pre-commit hook. Commits in this repo now run `git who check`.']);
+    });
+
+    it('works in the given directory instead of the current one', async () => {
+      const { install } = await loadHook();
+      await assert.doesNotReject(() => install('repo'));
+      assert.deepEqual(simpleGitCalls, ['repo']);
     });
 
     it('is not fooled by other hooks that are listed', async () => {
